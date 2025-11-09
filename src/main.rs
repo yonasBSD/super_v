@@ -35,11 +35,7 @@ use termion::{
     raw::IntoRawMode
 };
 
-// For image viewing
-use viuer::{Config};
-use image::DynamicImage;
-
-// // ---------------------------- Error --------------------------------
+// ---------------------------- Error --------------------------------
 #[derive(Debug)]
 #[allow(unused)]
 // Error when you try to overwrite a Pos
@@ -82,27 +78,7 @@ impl fmt::Display for ClipboardItem {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ClipboardItem::Text(s) => write!(f, "{}", s.replace('\n', "\r\n")),
-            ClipboardItem::Image {width, height, bytes} => {
-
-                let img = image::RgbaImage::from_raw(
-                    *width as u32,
-                    *height as u32,
-                    bytes.to_owned()
-                ).unwrap();
-
-                let dynamic_img = DynamicImage::ImageRgba8(img);
-
-                // Print to terminal
-                let conf = Config {
-                    width: Some(80),
-                    height: Some(24),
-                    ..Default::default()
-                };
-
-                viuer::print(&dynamic_img, &conf).unwrap();
-
-                write!(f, "")
-            }
+            ClipboardItem::Image {width, height, ..} => write!(f, "[Image: {width}x{height}]")
         }
     }
 }
@@ -235,7 +211,6 @@ impl Monitor for Clipboard {
             write!(stdout, "Monitoring Clipboard. Press 'q' to exit. \r\n").unwrap();
             stdout.flush().unwrap();
 
-
             for c in stdin.keys() {
                 if kb_stop.load(Ordering::SeqCst) {
                     break;
@@ -293,5 +268,8 @@ fn main() {
 
     let clipboard = Clipboard::new().unwrap();
     clipboard.monitor(); // <- Consumes Clipboard. Do not use for polling
+
+    // let mut clipboard = Clipboard::new().unwrap();
+    // println!("{}", clipboard.get_item().unwrap());
 }
 // -------------------------------------------------------------------
