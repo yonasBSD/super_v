@@ -38,11 +38,34 @@ pub trait Monitor {
 }
 
 impl Monitor for Clipboard {
-    // Usage:
-    // let clipboard = Clipboard::new().unwrap();
-    // clipboard.monitor();
-    
-    fn monitor(self) {        
+    /// A trait for monitoring & displaying clipboard content changes in real-time.
+    /// 
+    /// This trait provides functionality to continuously watch the clipboard
+    /// and display its contents whenever a change is detected. The monitoring
+    /// runs in two separate threads:
+    /// - One thread handles keyboard input to allow graceful exit (press 'q')
+    /// - Another thread polls the clipboard at 100ms intervals for changes
+    /// 
+    /// The monitor will clear the terminal and display new clipboard content
+    /// whenever it detects a change from the previous state.
+    /// 
+    /// # Examples
+    /// 
+    /// ```
+    /// use arboard::Clipboard;
+    /// use crate::monitor::Monitor;
+    /// 
+    /// let clipboard = Clipboard::new().unwrap();
+    /// clipboard.monitor(); // <- Consumes Clipboard. Do not use for polling
+    /// ```
+    /// 
+    /// # Notes
+    /// 
+    /// - This method consumes `self`, so the clipboard instance cannot be used after monitoring
+    /// - Requires a terminal with raw mode support (uses termion)
+    /// - Press 'q' or 'Q' to exit the monitoring loop
+    /// - Initial clipboard content is fetched at startup and used as the baseline
+    fn monitor(self) {
         let stop = Arc::new(AtomicBool::new(false));
 
         let kb_stop = stop.clone();

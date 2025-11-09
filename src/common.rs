@@ -9,10 +9,11 @@ use std::{
 use arboard::{Clipboard};
 
 // ---------------------------- Error --------------------------------
+/// Error types for clipboard operations.
 #[derive(Debug)]
 #[allow(unused)]
-// Error when you try to overwrite a Pos
 pub enum ClipboardErr {
+    /// Returned when attempting to access an empty clipboard
     ClipboardEmpty
 }
 
@@ -33,10 +34,17 @@ impl Error for ClipboardErr {}
 
 
 // ------------------------- Clipboard Item -----------------------------
+/// Represents an item that can be stored in the clipboard.
+/// 
+/// This enum supports both text and image data types, allowing the clipboard
+/// to handle multiple content formats.
 #[allow(unused)]
 #[derive(Debug, Clone, PartialEq)] // Debuggable, Cloneable and Comparable.
 pub enum ClipboardItem {
+    /// Plain text content
     Text(String),
+    
+    /// Image content with dimensions and raw bytes
     Image {
         width: usize,
         height: usize,
@@ -54,14 +62,28 @@ impl fmt::Display for ClipboardItem {
     }
 }
 
-// Compatibility with arboard
+/// Trait for retrieving clipboard content as a ClipboardItem.
+/// 
+/// This trait provides a unified interface for getting clipboard content,
+/// automatically detecting whether the content is text or an image.
 #[allow(unused)]
 pub trait GetItem {
+    /// Retrieves the current clipboard content.
+    /// 
+    /// # Returns
+    /// 
+    /// * `Ok(ClipboardItem)` - The clipboard content as either Text or Image
+    /// * `Err(ClipboardErr::ClipboardEmpty)` - If the clipboard is empty
     fn get_item(&mut self) -> Result<ClipboardItem, ClipboardErr>;
 }
 
-// Implementation for arboard
 impl GetItem for Clipboard {
+    /// Implementation of GetItem for arboard's Clipboard.
+    /// 
+    /// Attempts to retrieve clipboard content in the following order:
+    /// 1. Image data (if available)
+    /// 2. Text data (if available)
+    /// 3. Returns ClipboardEmpty error if neither is available
     fn get_item(&mut self) -> Result<ClipboardItem, ClipboardErr> {
         if let Ok(img_dat) = self.get_image() {
             Ok(ClipboardItem::Image { 

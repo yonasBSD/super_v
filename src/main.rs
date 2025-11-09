@@ -26,7 +26,7 @@ fn main() {
     // println!("{ch}");
 
     let clipboard = Clipboard::new().unwrap();
-    clipboard.monitor(); // <- Consumes Clipboard. Do not use for polling
+    clipboard.monitor();
 
     // let mut clipboard = Clipboard::new().unwrap();
     // println!("{}", clipboard.get_item().unwrap());
