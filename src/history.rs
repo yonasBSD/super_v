@@ -10,6 +10,10 @@ use std::{
 
 // External Crates
 use crate::common::ClipboardItem;
+use serde::{
+    Serialize, 
+    Deserialize
+};
 
 // --------------------- Hist Implementation -------------------------
 /// A clipboard history manager that maintains a fixed-size queue of clipboard items.
@@ -17,6 +21,7 @@ use crate::common::ClipboardItem;
 /// This structure keeps track of clipboard items in a VecDeque, automatically managing
 /// the history size and handling duplicate items by promoting them to the top.
 #[allow(unused)]
+#[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
 pub struct ClipboardHistory {
     history: VecDeque<ClipboardItem>,
     max_size: usize,

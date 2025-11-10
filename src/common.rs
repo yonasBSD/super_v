@@ -6,7 +6,14 @@ use std::{
 };
 
 // External Crates
-use arboard::{Clipboard};
+use arboard::Clipboard;
+use serde::{
+    Serialize, 
+    Deserialize
+};
+
+// My Crates
+use crate::history::ClipboardHistory;
 
 // ---------------------------- Error --------------------------------
 /// Error types for clipboard operations.
@@ -33,13 +40,13 @@ impl Error for ClipboardErr {}
 // -------------------------------------------------------------------
 
 
-// ------------------------- Clipboard Item -----------------------------
+// ----------------------- Clipboard Item ----------------------------
 /// Represents an item that can be stored in the clipboard.
 /// 
 /// This enum supports both text and image data types, allowing the clipboard
 /// to handle multiple content formats.
 #[allow(unused)]
-#[derive(Debug, Clone, PartialEq)] // Debuggable, Cloneable and Comparable.
+#[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
 pub enum ClipboardItem {
     /// Plain text content
     Text(String),
@@ -97,5 +104,35 @@ impl GetItem for Clipboard {
             Err(ClipboardErr::ClipboardEmpty)
         }
     }
+}
+// -------------------------------------------------------------------
+
+// ------------------------- IPC Items -------------------------------
+/// Represents the commands that IPC Supports
+/// 
+/// This enum allows for the following commands:
+/// * **Promote(usize)** - Command that promotes and item to top of history.
+/// * **Delete(usize)** - Command that deletes an item from history given its pos.
+/// * **Snapshot** - Command that retrieves the snapshot of the current Clipboard History
+/// * **Clear** - Command that clears the entire clipboard History.
+#[allow(unused)]
+#[derive(Debug, Serialize, Deserialize)]
+pub enum CmdIPC {
+    Promote(usize),
+    Delete(usize),
+    Snapshot,
+    Clear,
+}
+
+/// A data structure representing the Response of IPC.
+/// 
+/// Contains:
+/// * **history_snapshot** - A snapshot of the current ClipboardHistory from the Clipboard Manager Daemon
+/// * **message** - Optional message.
+#[allow(unused)]
+#[derive(Serialize, Deserialize)]
+struct IPCResponse { 
+    history_snapshot: ClipboardHistory,
+    message: Option<String>
 }
 // -------------------------------------------------------------------

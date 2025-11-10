@@ -5,7 +5,9 @@ edition = "2024"
 
 [dependencies]
 arboard = "3.6.1"
+clap = { version = "4.5.51", features = ["derive"] }
 ctrlc = "3.5.1"
 rdev = "0.5.3"
+serde = { version = "1.0.228", features = ["derive"] }
 
 termion = "4.0.5" # Termporary for handling debug in terminal
