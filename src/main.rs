@@ -28,17 +28,23 @@ use clap::{
     Subcommand
 };
 
+use rmp_serde::Serializer;
+use serde::Serialize;
 // My Crates
 #[allow(unused)]
 use super_v::{
     services::{
         clipboard_monitor::Monitor,
-        clipboard_manager::Manager
+        clipboard_manager::Manager,
+        clipboard_ipc_server::{
+            self,
+            CmdIPC,
+            IPCResponse,
+            Payload
+        }
     },
     common::{
-        ClipboardItem,
-        CmdIPC,
-        IPCResponse
+        ClipboardItem
     },
     history::ClipboardHistory
 };
@@ -59,7 +65,9 @@ enum Command {
     Start,
 
     /// Open the GUI
-    OpenGui
+    OpenGui,
+
+    Send
 }
 
 #[derive(Parser, Debug)]
@@ -74,9 +82,7 @@ struct Args {
     command: Command,
 }
 
-// const SOCKET_PATH: &str = "/tmp/superv.sock";
-
-fn spawn_manager() {
+fn start_manager_daemon() {
     let mut c_manager = match Manager::new() {
         Ok(manager) => {
             println!("Starting service...");
@@ -88,16 +94,28 @@ fn spawn_manager() {
         },
     };
 
-    c_manager._polling_service();
-
-    // block until ctrl-c or other code sets the stop flag
-    while !c_manager._stop_signal.load(Ordering::SeqCst) {
-        thread::sleep(Duration::from_secs(1));
-    }
-
-    // graceful shutdown (joins threads)
-    c_manager.stop();
+    c_manager.start_daemon();
 }
+fn ipc_server() {
+    let listener = clipboard_ipc_server::start().unwrap();
+    println!("Listening!");
+
+    // Handle incoming messages
+    for stream in listener.incoming() {
+        match stream {
+            Ok(s) => {
+                thread::spawn(|| {
+                    let p = clipboard_ipc_server::read_payload(s);
+                    println!("{:?}", p);
+                });
+            },
+            Err(e) => {
+                eprintln!("Accept Error: {e}");
+            }
+        }
+    }
+}
+
 // ----------------------------- Main --------------------------------
 fn main() {
     // History
@@ -116,12 +134,33 @@ fn main() {
     // let mut clipboard = Clipboard::new().unwrap();
     // println!("{}", clipboard.get_item().unwrap());
 
+    // Daemon
     let args= Args::parse();
     match args.command {
         Command::Start => {
-            spawn_manager();
+            // start_manager_daemon();
+            // println!("Disabled for debug!");
+            ipc_server();
+
+            // // Clone a stop signal
+            // let daemon_stop_signal = Arc::new(AtomicBool::new(false));
+            // let dss_clone = daemon_stop_signal.clone();
+
+            // let _ = ctrlc::set_handler(move || {
+            //     // When ctrl+c is detected, set true
+            //     dss_clone.store(true, Ordering::SeqCst);
+            // });
+            
+            // // Block until ctrl-c or other code sets the stop flag
+            // while !daemon_stop_signal.load(Ordering::SeqCst) {
+            //     thread::sleep(Duration::from_secs(1));
+            // }
+
         },
         Command::OpenGui => println!("Opening GUI..."),
+        Command::Send => {
+            clipboard_ipc_server::send_payload(clipboard_ipc_server::default_stream().unwrap(), Payload::Cmd(CmdIPC::Delete(20)));
+        }
     }
 }
 // -------------------------------------------------------------------

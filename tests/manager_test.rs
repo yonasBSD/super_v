@@ -12,7 +12,7 @@ mod clipboard_manager_test {
         time::Duration
     };
     use super_v::{
-        common::ClipboardErr, 
+        common::DaemonError, 
         services::clipboard_manager::Manager
     };
 
@@ -67,7 +67,7 @@ mod clipboard_manager_test {
                 panic!("MANAGER SHOULD NOT HAVE BEEN STARTED. MULTIPLE MANAGERS SPAWNED!")
             }
             Err(err) => {
-                assert_eq!(err, ClipboardErr::ManagerMultiSpawn);
+                assert_eq!(err, DaemonError::ManagerMultiSpawn);
             }
         }
 

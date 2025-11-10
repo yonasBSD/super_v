@@ -26,7 +26,7 @@ use crate::{
     common::{ 
         ClipboardItem, 
         GetItem,
-        ClipboardErr
+        DaemonError
     },
     history::ClipboardHistory
 };
@@ -76,7 +76,7 @@ impl Manager {
     ///
     /// **Returns**:
     /// - A fully constructed Manager with no active thread handles.
-    pub fn new() -> Result<Self, ClipboardErr> {
+    pub fn new() -> Result<Self, DaemonError> {
         // New history
         let history: Arc<Mutex<ClipboardHistory>> = Arc::new(
             Mutex::new(
@@ -115,7 +115,7 @@ impl Manager {
 
         // Return error if lock fails
         if let Err(_) = lock_file.try_lock_exclusive() {
-            return Err(ClipboardErr::ManagerMultiSpawn);
+            return Err(DaemonError::ManagerMultiSpawn);
         }
 
         // Write pid for reference
@@ -245,12 +245,23 @@ impl Manager {
     /// - Calls _polling_service to start the clipboard poller.
     /// - Calls _command_service to start command handling.
     /// - Each service checks whether it is already running and will not start duplicate
-    pub fn start_services(&mut self) {
+    pub fn start_daemon(&mut self) {
         // Start the polling service
         self._polling_service();
 
         // Start the command service
         self._command_service();
+
+        // Clone a stop signal
+        let daemon_stop_signal = self._stop_signal.clone();
+
+        // Block until ctrl-c or other code sets the stop flag
+        while !daemon_stop_signal.load(Ordering::SeqCst) {
+            thread::sleep(Duration::from_secs(1));
+        }
+
+        // Shutdown when daemon stops
+        self.stop();
     }
 
     /// Request shutdown and join worker threads.

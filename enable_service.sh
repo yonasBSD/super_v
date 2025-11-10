@@ -1,6 +1,9 @@
 #!/bin/bash
 set -euo pipefail
 
+# build the project as release 
+cargo build --release
+
 # Config
 USERNAME="$(id -un)"
 USERHOME="${HOME}"
@@ -8,7 +11,7 @@ SERVICE_NAME="super_v.service"
 USER_DIR="${USERHOME}/.config/systemd/user"
 USER_PATH="${USER_DIR}/${SERVICE_NAME}"
 PROJECT_DIR="/home/ecstra/Desktop/super_v"
-BINARY_PATH="${PROJECT_DIR}/target/debug/super_v"
+BINARY_PATH="${PROJECT_DIR}/target/release/super_v"
 USER_LOG="${USERHOME}/superv.log"
 
 # Stop and remove any system service to avoid conflicts (requires sudo)

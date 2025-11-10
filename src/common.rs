@@ -12,37 +12,74 @@ use serde::{
     Deserialize
 };
 
-// My Crates
-use crate::history::ClipboardHistory;
-
-// ---------------------------- Error --------------------------------
+// --------------------------- Errors --------------------------------
 /// Error types for clipboard operations.
 #[derive(Debug, PartialEq)]
 #[allow(unused)]
-pub enum ClipboardErr {
+pub enum ClipboardError {
     /// Returned when attempting to access an empty clipboard
-    ClipboardEmpty,
+    ClipboardEmpty
+}
 
+/// Error Type for Clipboard Manager Daemon
+#[derive(Debug, PartialEq)]
+#[allow(unused)]
+pub enum DaemonError {
     /// Returned when attempting to spawn Manager but an instance is already running.
-    ManagerMultiSpawn,
+    ManagerMultiSpawn
+}
+
+/// Error Type for IPCServer
+#[derive(Debug, PartialEq)]
+#[allow(unused)]
+pub enum IPCServerError {
+    ConnectionError(String),
+    BindError(String),
+    SendError(String),
 }
 
 // Displays for the Errors
-impl fmt::Display for ClipboardErr {
+impl fmt::Display for ClipboardError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ClipboardErr::ClipboardEmpty => {
+            ClipboardError::ClipboardEmpty => {
                 write!(f, "Clipboard is empty. Please add copy something before trying again.")
-            },
-            ClipboardErr::ManagerMultiSpawn => {
-                write!(f, "Another manager instance is already running")
             }
         }
     }
 }
 
+impl fmt::Display for DaemonError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            DaemonError::ManagerMultiSpawn => {
+                write!(f, "An instance of the Manager is already open.")
+            }
+        }
+    }
+}
+
+impl fmt::Display for IPCServerError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            IPCServerError::ConnectionError(string) => {
+                write!(f, "Could not connect to socket: {}", string)
+            },
+            IPCServerError::BindError(string) => {
+                write!(f, "Could not bind to socket: {}", string)
+            },
+            IPCServerError::SendError(string) => {
+                write!(f, "Could not send item: {}", string)
+            }
+        }
+    }
+}
+
+
 // Implement the structs as Errors
-impl Error for ClipboardErr {}
+impl Error for ClipboardError {}
+impl Error for DaemonError {}
+impl Error for IPCServerError {}
 // -------------------------------------------------------------------
 
 
@@ -87,7 +124,7 @@ pub trait GetItem {
     /// 
     /// * `Ok(ClipboardItem)` - The clipboard content as either Text or Image
     /// * `Err(ClipboardErr::ClipboardEmpty)` - If the clipboard is empty
-    fn get_item(&mut self) -> Result<ClipboardItem, ClipboardErr>;
+    fn get_item(&mut self) -> Result<ClipboardItem, ClipboardError>;
 }
 
 impl GetItem for Clipboard {
@@ -97,7 +134,7 @@ impl GetItem for Clipboard {
     /// 1. Image data (if available)
     /// 2. Text data (if available)
     /// 3. Returns ClipboardEmpty error if neither is available
-    fn get_item(&mut self) -> Result<ClipboardItem, ClipboardErr> {
+    fn get_item(&mut self) -> Result<ClipboardItem, ClipboardError> {
         if let Ok(img_dat) = self.get_image() {
             Ok(ClipboardItem::Image { 
                 width: img_dat.width, 
@@ -107,39 +144,8 @@ impl GetItem for Clipboard {
         } else if let Ok(str_data) = self.get_text() {
             Ok(ClipboardItem::Text(str_data))
         } else {
-            Err(ClipboardErr::ClipboardEmpty)
+            Err(ClipboardError::ClipboardEmpty)
         }
     }
-}
-// -------------------------------------------------------------------
-
-
-// ------------------------- IPC Items -------------------------------
-/// Represents the commands that IPC Supports
-/// 
-/// This enum allows for the following commands:
-/// * **Promote(usize)** - Command that promotes and item to top of history.
-/// * **Delete(usize)** - Command that deletes an item from history given its pos.
-/// * **Snapshot** - Command that retrieves the snapshot of the current Clipboard History
-/// * **Clear** - Command that clears the entire clipboard History.
-#[allow(unused)]
-#[derive(Debug, Serialize, Deserialize)]
-pub enum CmdIPC {
-    Promote(usize),
-    Delete(usize),
-    Snapshot,
-    Clear,
-}
-
-/// A data structure representing the Response of IPC.
-/// 
-/// Contains:
-/// * **history_snapshot** - A snapshot of the current ClipboardHistory from the Clipboard Manager Daemon
-/// * **message** - Optional message.
-#[allow(unused)]
-#[derive(Serialize, Deserialize)]
-pub struct IPCResponse { 
-    history_snapshot: ClipboardHistory,
-    message: Option<String>
 }
 // -------------------------------------------------------------------
