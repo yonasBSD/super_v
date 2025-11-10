@@ -17,11 +17,16 @@ use crate::history::ClipboardHistory;
 
 // ---------------------------- Error --------------------------------
 /// Error types for clipboard operations.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 #[allow(unused)]
 pub enum ClipboardErr {
     /// Returned when attempting to access an empty clipboard
-    ClipboardEmpty
+    ClipboardEmpty,
+
+    /// Returned when attempting to spawn Manager but an instance is already running.
+    ManagerMultiSpawn,
+    
+    IOError
 }
 
 // Displays for the Errors
@@ -30,6 +35,12 @@ impl fmt::Display for ClipboardErr {
         match self {
             ClipboardErr::ClipboardEmpty => {
                 write!(f, "Clipboard is empty. Please add copy something before trying again.")
+            },
+            ClipboardErr::ManagerMultiSpawn => {
+                write!(f, "Another manager instance is already running")
+            },
+            ClipboardErr::IOError => {
+                write!(f, "Acquiring Lockfile failed.")
             }
         }
     }
@@ -107,6 +118,7 @@ impl GetItem for Clipboard {
 }
 // -------------------------------------------------------------------
 
+
 // ------------------------- IPC Items -------------------------------
 /// Represents the commands that IPC Supports
 /// 
@@ -131,7 +143,7 @@ pub enum CmdIPC {
 /// * **message** - Optional message.
 #[allow(unused)]
 #[derive(Serialize, Deserialize)]
-struct IPCResponse { 
+pub struct IPCResponse { 
     history_snapshot: ClipboardHistory,
     message: Option<String>
 }

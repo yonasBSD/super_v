@@ -1,5 +1,7 @@
 #[cfg(test)]
-mod clipboard_poller_test {
+mod clipboard_manager_test {
+    use serial_test::serial;
+    use core::panic;
     use std::{
         thread,
         sync::{
@@ -10,13 +12,15 @@ mod clipboard_poller_test {
         time::Duration
     };
     use super_v::{
+        common::ClipboardErr, 
         services::clipboard_manager::Manager
     };
 
     #[test]
+    #[serial]
     fn test_poller_stops_on_signal() {
         // Create new manager
-        let mut manager = Manager::new();
+        let mut manager = Manager::new().unwrap();
 
         // start polling
         manager._polling_service(); 
@@ -43,8 +47,44 @@ mod clipboard_poller_test {
                 panic!("POLLING HANDLE EMPTY WHEN IT SHOULD NOT HAVE BEEN!");
             }
         }
-
     }
+
+    // #[test]
+    // #[serial]
+    // fn test_manager_multi_spawn() {
+    //     // Spawn a manager
+    //     let _ = Manager::new();
+
+    //     // Spawn another manager
+    //     let err_manager = Manager::new();
+
+    //     // Check if 
+    //     match err_manager {
+    //         Ok(_) => {
+    //             panic!("MANAGER SHOULD NOT HAVE BEEN STARTED. MULTIPLE MANAGERS SPAWNED!")
+    //         }
+    //         Err(err) => {
+    //             assert_eq!(err, ClipboardErr::ManagerMultiSpawn);
+    //         }
+    //     }
+    // }
+
+    // #[test]
+    // #[serial]
+    // fn test_manager_unlock() {
+    //     // Spawn a manager
+    //     let mut manager: Manager = Manager::new().unwrap();
+
+    //     // close the manager
+    //     manager.stop();
+
+    //     // Spawn a second manager 
+    //     match Manager::new() {
+    //         Ok(_) => {/* Passed */},
+    //         Err(_) => {panic!("MANAGER DID NOT SPAWN! PREVIOUS MANAGER NOT CLEANED!")},
+    //     };
+
+    // }
 
     // Add more tests here...
 

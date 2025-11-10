@@ -7,9 +7,14 @@ use std::{
             AtomicBool, 
             Ordering 
         }
-    }, 
-    thread::{self, JoinHandle, sleep}, 
+    },
+    thread::{
+        self, 
+        JoinHandle, 
+        sleep
+    },
     time::Duration
+
 };
 
 // External Crates
@@ -19,13 +24,11 @@ use arboard::Clipboard;
 use crate::{
     common::{ 
         ClipboardItem, 
-        GetItem 
+        GetItem,
+        ClipboardErr
     },
     history::ClipboardHistory
 };
-
-// Clipboard Size
-const CLIPBOARD_SIZE: usize = 25;
 
 /// # Manager
 ///  Holds shared services and thread handles for the clipboard manager.
@@ -40,16 +43,21 @@ const CLIPBOARD_SIZE: usize = 25;
 /// These fields are internal to the implementation and not intended for public API use.
 /// Check implementation of Manager for usage.
 pub struct Manager {
+    // Needed for operation
     pub _clipboard_service: Arc<Mutex<Clipboard>>,
     pub _shared_history: Arc<Mutex<ClipboardHistory>>,
     pub _stop_signal:Arc<AtomicBool>,
 
+    // Thread handles
     pub _polling_handle: Option<JoinHandle<()>>,
-    pub _command_handle: Option<JoinHandle<()>>,
+    pub _command_handle: Option<JoinHandle<()>>
 }
 
 impl Manager {
-    
+    // Clipboard Size
+    const CLIPBOARD_SIZE: usize = 25;
+    // const LOCK_PATH: &str = "/tmp/super_v.lock";
+
     /// Create a new Manager instance and configure global handlers.
     ///
     /// **Behavior**:
@@ -57,17 +65,18 @@ impl Manager {
     /// - Creates and wraps a Clipboard service in an Arc<Mutex<...>>.
     /// - Creates an Arc<AtomicBool> stop signal used by worker threads.
     /// - Installs a ctrl-c handler that updates the stop signal.
+    /// - Has a process lock so duplicate processes can't be run.
     ///
     /// **Panics / errors**:
     /// - This constructor unwraps the clipboard creation and will panic if the clipboard cannot be initialized.
     ///
     /// **Returns**:
     /// - A fully constructed Manager with no active thread handles.
-    pub fn new() -> Self {
+    pub fn new() -> Result<Self, ClipboardErr> {
         // New history
         let history: Arc<Mutex<ClipboardHistory>> = Arc::new(
             Mutex::new(
-                ClipboardHistory::new(CLIPBOARD_SIZE)
+                ClipboardHistory::new(Self::CLIPBOARD_SIZE)
             )
         );
 
@@ -87,8 +96,13 @@ impl Manager {
             ss_clone.store(false, Ordering::SeqCst);
         });
 
+        
+        // Needs to not open when already running
+        // ...
+        // todo!();
+
         // Return the manager object
-        Self {
+        Ok(Self {
             _clipboard_service: _clipboard_service,
             _shared_history: history,
             _stop_signal: _stop_signal,
@@ -96,7 +110,7 @@ impl Manager {
             // No handles yet.
             _polling_handle: None,
             _command_handle: None
-        }
+        })
     }
 
     /// Start the polling service in a new background thread.
@@ -176,11 +190,24 @@ impl Manager {
         }));
     }
 
-    // Starts the command service in a thread
+    /// Start the command-handling service in a background thread.
+    ///
+    /// **Behavior**:
+    /// - Listens for incoming IPC messages from external processes.
+    /// - Parses commands serialized as CmdIPC variants (e.g., Promote, Delete, Snapshot, Clear).
+    /// - Executes the requested operation on the shared ClipboardHistory instance.
+    /// - Constructs an IPCResponse containing:
+    ///     - A current snapshot of the ClipboardHistory.
+    ///     - An optional message describing the operation result.
+    /// - Sends the serialized IPCResponse back through IPC to the caller.
+    ///
+    /// **Notes**:
+    /// - This service runs concurrently and in the same process with the clipboard polling thread (or it won't work).
+    /// - Should store the thread JoinHandle in _command_handle.
     pub fn _command_service(&mut self) {
 
     }
-
+    
     /// Start all configured background services.
     ///
     /// **Behavior**:
@@ -206,14 +233,15 @@ impl Manager {
     /// - After stop returns, worker threads will have been requested to stop and any existing handles will be joined.
     /// - This method swallows join errors and does not return a failure result.
     pub fn stop(&mut self) {
-        // signal threads to stop
+        // Signal threads to stop
         self._stop_signal.store(true, Ordering::SeqCst);
 
-        // take the handles
+        // Take the handles
         let _polling_handle = self._polling_handle.take();
         let _command_handle = self._command_handle.take();
 
-        // spawn a short-lived thread to join them so main thread is not blocked
+        // Spawn a short-lived thread to join them so main thread is not blocked
+        // All errors are swallowed
         let _ = thread::spawn(move || {
             if let Some(h) = _polling_handle {
                 let _ = h.join();
