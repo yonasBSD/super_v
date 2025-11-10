@@ -58,7 +58,7 @@ enum Command {
     Start,
 
     /// Open the GUI
-    OpenGui,
+    OpenGui
 }
 
 #[derive(Parser, Debug)]
@@ -96,7 +96,12 @@ fn main() {
     let args= Args::parse();
     match args.command {
         Command::Start => {
-            Manager::new().unwrap();
+            println!("Starting service");
+            let mut c_manager = match Manager::new() {
+                Ok(manager) => {manager},
+                Err(_) => {panic!("MANAGER COULD NOT BE STARTED!")},
+            };
+            c_manager._polling_service();
         },
         Command::OpenGui => println!("Opening GUI..."),
     }

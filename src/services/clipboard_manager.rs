@@ -7,18 +7,19 @@ use std::{
             AtomicBool, 
             Ordering 
         }
+    }, 
+    fs::{
+        File,
+        OpenOptions
     },
-    thread::{
-        self, 
-        JoinHandle, 
-        sleep
-    },
-    time::Duration
-
+    thread::{self, JoinHandle, sleep}, 
+    time::Duration,
+    io::Write
 };
 
 // External Crates
 use arboard::Clipboard;
+use fs2::FileExt;
 
 // My Crates
 use crate::{
@@ -50,13 +51,16 @@ pub struct Manager {
 
     // Thread handles
     pub _polling_handle: Option<JoinHandle<()>>,
-    pub _command_handle: Option<JoinHandle<()>>
+    pub _command_handle: Option<JoinHandle<()>>,
+
+    // Lock file to prevent multiple starts.
+    pub _lock_file: Option<File>,
 }
 
 impl Manager {
     // Clipboard Size
     const CLIPBOARD_SIZE: usize = 25;
-    // const LOCK_PATH: &str = "/tmp/super_v.lock";
+    const LOCK_PATH: &str = "/tmp/super_v.lock";
 
     /// Create a new Manager instance and configure global handlers.
     ///
@@ -83,7 +87,12 @@ impl Manager {
         // Clipboard service
         let _clipboard_service: Arc<Mutex<Clipboard>> = Arc::new(
             Mutex::new(
-                Clipboard::new().unwrap()
+                match Clipboard::new() {
+                    Ok(clipboard) => {clipboard},
+                    Err(err) => {
+                        panic!("ERROR: {:?}", err);
+                    }
+                }
             )
         );
 
@@ -93,14 +102,26 @@ impl Manager {
         // Setup ctrl+c
         let ss_clone = _stop_signal.clone();
         let _ = ctrlc::set_handler(move || {
-            ss_clone.store(false, Ordering::SeqCst);
+            ss_clone.store(true, Ordering::SeqCst);
         });
 
-        
-        // Needs to not open when already running
-        // ...
-        // todo!();
+        // Try lock
+        let lock_file = OpenOptions::new()
+            .create(true)
+            .write(true)
+            .open(Self::LOCK_PATH)
+            .expect("Failed to open lock file");
 
+        // Return error if lock fails
+        if let Err(_) = lock_file.try_lock_exclusive() {
+            return Err(ClipboardErr::ManagerMultiSpawn);
+        }
+
+        // Write pid for reference
+        let _ = lock_file.set_len(0);
+        let _ = write!(&lock_file, "{}", std::process::id());
+        let _ = lock_file.sync_all();
+        
         // Return the manager object
         Ok(Self {
             _clipboard_service: _clipboard_service,
@@ -109,7 +130,9 @@ impl Manager {
 
             // No handles yet.
             _polling_handle: None,
-            _command_handle: None
+            _command_handle: None,
+
+            _lock_file: Some(lock_file)
         })
     }
 
@@ -131,7 +154,7 @@ impl Manager {
     pub fn _polling_service(&mut self) {
         // Check if polling thread is already started
         let None = self._polling_handle else {
-            eprintln!("Polling service is already running");
+            println!("Polling service is already running");
             return;
         };
 
@@ -139,6 +162,7 @@ impl Manager {
         let clipboard_service = self._clipboard_service.clone();
         let stop_signal = self._stop_signal.clone();
         let shared_history = self._shared_history.clone();
+        println!("Started Polling...");
 
         // Start the polling in a thread and store the handle
         self._polling_handle = Some(thread::spawn(move || {
@@ -156,8 +180,7 @@ impl Manager {
             };
             
             while !stop_signal.load(Ordering::SeqCst) {
-                // Poll every 500ms
-                sleep(Duration::from_millis(500));
+                println!("Checking for changes in clipbaord");
 
                 // Item Checking
                 let current_item = match clipboard_service.try_lock() {
@@ -174,6 +197,8 @@ impl Manager {
                 // So no need for thread-to-thread communication management and can purely focus on IPC management.
                 // Checks if item is new or not.
                 if current_item != last_item {
+                    println!("Change found! Before: \n```\n{}\n```\n\n After: \n```\n{}\n```\n\n", last_item, current_item);
+
                     // Acquire Lock
                     match shared_history.try_lock() {
                         Ok(mut unlocked_history) => {
@@ -186,6 +211,9 @@ impl Manager {
                         Err(_) => {/* Failed To Get Lock, Skip */},
                     }
                 }
+
+                // Poll every 500ms
+                sleep(Duration::from_millis(500));
             }
         }));
     }
@@ -250,5 +278,11 @@ impl Manager {
                 let _ = h.join();
             }
         }).join();
+
+        // Unlock the lock file
+        // Swallows the error.
+        if let Some(lockfile) = &self._lock_file {
+            let _ = lockfile.unlock();
+        }
     }
 }

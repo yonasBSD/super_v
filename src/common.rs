@@ -25,8 +25,6 @@ pub enum ClipboardErr {
 
     /// Returned when attempting to spawn Manager but an instance is already running.
     ManagerMultiSpawn,
-    
-    IOError
 }
 
 // Displays for the Errors
@@ -38,9 +36,6 @@ impl fmt::Display for ClipboardErr {
             },
             ClipboardErr::ManagerMultiSpawn => {
                 write!(f, "Another manager instance is already running")
-            },
-            ClipboardErr::IOError => {
-                write!(f, "Acquiring Lockfile failed.")
             }
         }
     }

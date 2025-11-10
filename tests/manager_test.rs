@@ -47,44 +47,50 @@ mod clipboard_manager_test {
                 panic!("POLLING HANDLE EMPTY WHEN IT SHOULD NOT HAVE BEEN!");
             }
         }
+
+        // Close the manager
+        manager.stop();
     }
 
-    // #[test]
-    // #[serial]
-    // fn test_manager_multi_spawn() {
-    //     // Spawn a manager
-    //     let _ = Manager::new();
+    #[test]
+    #[serial]
+    fn test_manager_multi_spawn() {
+        // Spawn a manager
+        let manager = Manager::new();
 
-    //     // Spawn another manager
-    //     let err_manager = Manager::new();
+        // Spawn another manager
+        let err_manager = Manager::new();
 
-    //     // Check if 
-    //     match err_manager {
-    //         Ok(_) => {
-    //             panic!("MANAGER SHOULD NOT HAVE BEEN STARTED. MULTIPLE MANAGERS SPAWNED!")
-    //         }
-    //         Err(err) => {
-    //             assert_eq!(err, ClipboardErr::ManagerMultiSpawn);
-    //         }
-    //     }
-    // }
+        // Check if 
+        match err_manager {
+            Ok(_) => {
+                panic!("MANAGER SHOULD NOT HAVE BEEN STARTED. MULTIPLE MANAGERS SPAWNED!")
+            }
+            Err(err) => {
+                assert_eq!(err, ClipboardErr::ManagerMultiSpawn);
+            }
+        }
 
-    // #[test]
-    // #[serial]
-    // fn test_manager_unlock() {
-    //     // Spawn a manager
-    //     let mut manager: Manager = Manager::new().unwrap();
+        // Close the manager
+        manager.unwrap().stop();
+    }
 
-    //     // close the manager
-    //     manager.stop();
+    #[test]
+    #[serial]
+    fn test_manager_unlock() {
+        // Spawn a manager
+        let mut manager: Manager = Manager::new().unwrap();
 
-    //     // Spawn a second manager 
-    //     match Manager::new() {
-    //         Ok(_) => {/* Passed */},
-    //         Err(_) => {panic!("MANAGER DID NOT SPAWN! PREVIOUS MANAGER NOT CLEANED!")},
-    //     };
+        // close the manager
+        manager.stop();
 
-    // }
+        // Spawn a second manager 
+        match Manager::new() {
+            Ok(_) => {/* Passed */},
+            Err(_) => {panic!("MANAGER DID NOT SPAWN! PREVIOUS MANAGER NOT CLEANED!")},
+        };
+
+    }
 
     // Add more tests here...
 
