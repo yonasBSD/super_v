@@ -1,3 +1,4 @@
+use std::time::Duration;
 // Standard Crates
 #[allow(unused)]
 use std::{
@@ -75,6 +76,28 @@ struct Args {
 
 // const SOCKET_PATH: &str = "/tmp/superv.sock";
 
+fn spawn_manager() {
+    let mut c_manager = match Manager::new() {
+        Ok(manager) => {
+            println!("Starting service...");
+            manager
+        },
+        Err(_) => {
+            eprintln!("Another instance of Manager already running.");
+            process::exit(0);
+        },
+    };
+
+    c_manager._polling_service();
+
+    // block until ctrl-c or other code sets the stop flag
+    while !c_manager._stop_signal.load(Ordering::SeqCst) {
+        thread::sleep(Duration::from_secs(1));
+    }
+
+    // graceful shutdown (joins threads)
+    c_manager.stop();
+}
 // ----------------------------- Main --------------------------------
 fn main() {
     // History
@@ -96,12 +119,7 @@ fn main() {
     let args= Args::parse();
     match args.command {
         Command::Start => {
-            println!("Starting service");
-            let mut c_manager = match Manager::new() {
-                Ok(manager) => {manager},
-                Err(_) => {panic!("MANAGER COULD NOT BE STARTED!")},
-            };
-            c_manager._polling_service();
+            spawn_manager();
         },
         Command::OpenGui => println!("Opening GUI..."),
     }

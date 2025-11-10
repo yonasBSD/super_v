@@ -102,6 +102,7 @@ impl Manager {
         // Setup ctrl+c
         let ss_clone = _stop_signal.clone();
         let _ = ctrlc::set_handler(move || {
+            // When ctrl+c is detected, set true
             ss_clone.store(true, Ordering::SeqCst);
         });
 
@@ -166,6 +167,8 @@ impl Manager {
 
         // Start the polling in a thread and store the handle
         self._polling_handle = Some(thread::spawn(move || {
+            println!("Started Polling in thread...");
+
             let empty_item = ClipboardItem::Text("".to_string());
 
             // Get the current item in clipboard. This will be compared with and edited
