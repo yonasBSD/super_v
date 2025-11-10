@@ -97,23 +97,25 @@ fn start_manager_daemon() {
     c_manager.start_daemon();
 }
 fn ipc_server() {
-    let listener = clipboard_ipc_server::start().unwrap();
-    println!("Listening!");
+    thread::spawn(|| {
+        let listener = clipboard_ipc_server::start().unwrap();
+        println!("Listening!");
 
-    // Handle incoming messages
-    for stream in listener.incoming() {
-        match stream {
-            Ok(s) => {
-                thread::spawn(|| {
-                    let p = clipboard_ipc_server::read_payload(s);
-                    println!("{:?}", p);
-                });
-            },
-            Err(e) => {
-                eprintln!("Accept Error: {e}");
+        // Handle incoming messages
+        for stream in listener.incoming() {
+            match stream {
+                Ok(s) => {
+                    thread::spawn(|| {
+                        let p = clipboard_ipc_server::read_payload(s);
+                        println!("{:?}", p);
+                    });
+                },
+                Err(e) => {
+                    eprintln!("Accept Error: {e}");
+                }
             }
         }
-    }
+    });
 }
 
 // ----------------------------- Main --------------------------------
@@ -142,19 +144,19 @@ fn main() {
             // println!("Disabled for debug!");
             ipc_server();
 
-            // // Clone a stop signal
-            // let daemon_stop_signal = Arc::new(AtomicBool::new(false));
-            // let dss_clone = daemon_stop_signal.clone();
+            // Clone a stop signal
+            let daemon_stop_signal = Arc::new(AtomicBool::new(false));
+            let dss_clone = daemon_stop_signal.clone();
 
-            // let _ = ctrlc::set_handler(move || {
-            //     // When ctrl+c is detected, set true
-            //     dss_clone.store(true, Ordering::SeqCst);
-            // });
+            let _ = ctrlc::set_handler(move || {
+                // When ctrl+c is detected, set true
+                dss_clone.store(true, Ordering::SeqCst);
+            });
             
-            // // Block until ctrl-c or other code sets the stop flag
-            // while !daemon_stop_signal.load(Ordering::SeqCst) {
-            //     thread::sleep(Duration::from_secs(1));
-            // }
+            // Block until ctrl-c or other code sets the stop flag
+            while !daemon_stop_signal.load(Ordering::SeqCst) {
+                thread::sleep(Duration::from_secs(1));
+            }
 
         },
         Command::OpenGui => println!("Opening GUI..."),

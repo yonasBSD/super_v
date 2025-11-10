@@ -80,11 +80,7 @@ const SOCKET_PATH: &str = "/tmp/super_v.sock";
 pub fn start() -> Result<UnixListener, IPCServerError> {
     // Create a new listener
     let listener = match UnixListener::bind(SOCKET_PATH) {
-        Ok(listener) => {
-            // Remove old sock file
-            let _ = remove_file(SOCKET_PATH);
-            listener
-        },
+        Ok(listener) => {listener},
         Err(err) => {
             return Err(IPCServerError::BindError(String::from(format!("{:?}", err))));
         }
