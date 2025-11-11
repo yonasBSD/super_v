@@ -102,6 +102,7 @@ const SOCKET_PATH: &str = "/tmp/super_v.sock";
 ///
 /// # Example
 /// ```no_run
+/// use super_v::services::clipboard_ipc_server::create_bind;
 /// let listener = create_bind().expect("Failed to bind IPC server");
 /// ```
 pub fn create_bind() -> Result<UnixListener, IPCServerError> {
@@ -141,6 +142,7 @@ pub fn create_bind() -> Result<UnixListener, IPCServerError> {
 ///
 /// # Example
 /// ```no_run
+/// use super_v::services::clipboard_ipc_server::create_default_stream;
 /// let mut stream = create_default_stream().expect("Unable to connect to IPC server");
 /// ```
 pub fn create_default_stream() -> Result<UnixStream, IPCServerError> {
@@ -181,6 +183,7 @@ pub fn create_default_stream() -> Result<UnixStream, IPCServerError> {
 ///
 /// # Example
 /// ```no_run
+/// use super_v::services::clipboard_ipc_server::{create_default_stream, send_payload, Payload, CmdIPC};
 /// let mut stream = create_default_stream().unwrap();
 /// send_payload(&mut stream, Payload::Cmd(CmdIPC::Snapshot));
 /// ```
@@ -215,6 +218,7 @@ pub fn send_payload(stream: &mut UnixStream, item: Payload) {
 ///
 /// # Example
 /// ```no_run
+/// use super_v::services::clipboard_ipc_server::{create_default_stream, read_payload};
 /// let mut stream = create_default_stream().unwrap();
 /// let payload = read_payload(&mut stream);
 /// println!("{:?}", payload);

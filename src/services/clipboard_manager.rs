@@ -2,15 +2,27 @@
 use std::{
     fs::{
         File,
-        OpenOptions
-    }, io::Write, os::unix::net::{UnixListener, UnixStream}, sync::{
+        OpenOptions, 
+        remove_file
+    }, 
+    io::Write, 
+    os::unix::net::{
+        UnixListener, 
+        UnixStream
+    }, 
+    sync::{
         Arc, 
         Mutex, 
         atomic::{ 
             AtomicBool, 
             Ordering 
         }
-    }, thread::{self, JoinHandle, sleep}, time::Duration
+    }, thread::{
+        self, 
+        JoinHandle, 
+        sleep
+    }, 
+    time::Duration
 };
 
 // External Crates
@@ -453,6 +465,8 @@ impl Manager {
         // Swallows the error.
         if let Some(lockfile) = &self._lock_file {
             let _ = lockfile.unlock();
+            let _ = remove_file("/tmp/super_v.sock");
+            let _ = remove_file("/tmp/super_v.lock");
         }
     }
 }

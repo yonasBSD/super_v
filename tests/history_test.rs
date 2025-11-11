@@ -62,7 +62,7 @@ mod history_tests {
 
         // Promote item 2
         // This should re-order from 3->2->1 to 2->3->1
-        history.promote(1);
+        history.promote(1).unwrap();
 
         // Compare
         assert_eq!(history.get_items(), &VecDeque::from([item2, item3, item1]));
@@ -78,7 +78,7 @@ mod history_tests {
         history.add(item1);
         
         // Try to promote an index that doesn't exist (should panic)
-        history.promote(5);
+        history.promote(5).unwrap();
     }
 
     #[test]
@@ -88,7 +88,7 @@ mod history_tests {
         let mut history = ClipboardHistory::new(5);
         
         // Try to promote from empty history (should panic)
-        history.promote(0);
+        history.promote(0).unwrap();
     }
 
     #[test]
@@ -104,7 +104,7 @@ mod history_tests {
         
         // Try to promote at exactly the length (should panic)
         // If we have 2 items (indices 0,1), trying to access index 2 should panic
-        history.promote(2);
+        history.promote(2).unwrap();
     }
 
     #[test]
@@ -211,10 +211,10 @@ mod history_tests {
         history.add(item3.clone());
         
         // Promote item at index 2 multiple times
-        history.promote(2); // 3,2,1 -> 1,3,2
+        history.promote(2).unwrap(); // 3,2,1 -> 1,3,2
         assert_eq!(history.get_items(), &VecDeque::from([item1.clone(), item3.clone(), item2.clone()]));
         
-        history.promote(2); // 1,3,2 -> 2,1,2
+        history.promote(2).unwrap(); // 1,3,2 -> 2,1,2
         assert_eq!(history.get_items(), &VecDeque::from([item2.clone(), item1.clone(), item3.clone()]));
     }
 
@@ -320,7 +320,7 @@ mod history_tests {
         history.add(item2.clone());
         
         // Promote first item (index 0) - should remain at top
-        history.promote(0);
+        history.promote(0).unwrap();
         
         assert_eq!(history.get_items(), &VecDeque::from([item2, item1]));
     }
@@ -341,7 +341,7 @@ mod history_tests {
         history.add(item3.clone());
         
         // Promote last item (index 2)
-        history.promote(2);
+        history.promote(2).unwrap();
         
         assert_eq!(history.get_items(), &VecDeque::from([item1, item3, item2]));
     }
