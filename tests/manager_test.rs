@@ -1,19 +1,38 @@
 #[cfg(test)]
 mod clipboard_manager_test {
-    use arboard::{Clipboard, ImageData};
+    use arboard::{
+        Clipboard, 
+        ImageData
+    };
     use serial_test::serial;
     use core::panic;
     use std::{
-        borrow::Cow, sync::atomic::Ordering, thread, time::Duration
+        thread,
+        borrow::Cow, 
+        sync::atomic::Ordering, 
+        time::Duration
     };
     use super_v::{
-        common::{ClipboardItem, DaemonError}, 
-        services::{clipboard_ipc_server::{CmdIPC, IPCResponse, Payload, create_default_stream, read_payload, send_payload}, clipboard_manager::Manager}
+        common::{
+            ClipboardItem, 
+            DaemonError
+        }, 
+        services::{
+            clipboard_ipc_server::{
+                CmdIPC, 
+                IPCResponse, 
+                Payload, 
+                create_default_stream, 
+                read_payload, 
+                send_payload
+            }, 
+            clipboard_manager::Manager
+        }
     };
 
     // ------------------ Helper Functions ----------------------
     fn get_hopeful_history() -> Vec<ClipboardItem> {
-            let item1 = ClipboardItem::Text("item1".into());
+        let item1 = ClipboardItem::Text("item1".into());
         let item2 = ClipboardItem::Text("item2".into());
         let item3 = ClipboardItem::Text("item3".into());
         let image = ClipboardItem::Image {
@@ -42,16 +61,16 @@ mod clipboard_manager_test {
                 bytes: Cow::from([0u8; 10000].as_ref()),
             }
         );
-        thread::sleep(Duration::from_millis(200));
+        thread::sleep(Duration::from_millis(250));
 
         let _ = clipboard_service.set_text("item3");
-        thread::sleep(Duration::from_millis(200));
+        thread::sleep(Duration::from_millis(250));
 
         let _ = clipboard_service.set_text("item2");
-        thread::sleep(Duration::from_millis(200));
+        thread::sleep(Duration::from_millis(250));
 
         let _ = clipboard_service.set_text("item1");
-        thread::sleep(Duration::from_millis(200));
+        thread::sleep(Duration::from_millis(250));
 
         // Create a new default stream
         let mut stream = create_default_stream().unwrap();

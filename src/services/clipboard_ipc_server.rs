@@ -196,8 +196,8 @@ pub fn send_payload(stream: &mut UnixStream, item: Payload) {
     let payload = item.to_payload();
 
     // Send len
-    // We know the size of the lenght (4).
-    // Using that, we can extract the lenght of actual message (x)
+    // We know the size of the length (4).
+    // Using that, we can extract the length of actual message (x)
     // and read for that len. 
     // This way sending message of changing length works.
     stream.write_all(&payload.len).unwrap();
@@ -238,6 +238,5 @@ pub fn read_payload(stream: &mut UnixStream) -> Payload {
     stream.read_exact(&mut payload).unwrap();
 
     // deserialize
-    let cmd: Payload = rmp_serde::from_slice(&payload).expect("failed to deserialize");
-    cmd
+    rmp_serde::from_slice(&payload).expect("failed to deserialize")
 }
