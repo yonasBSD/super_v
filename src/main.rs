@@ -44,7 +44,8 @@ enum Command {
     /// Cleans any leftovers
     Clean,
 
-    Send
+    // Used for testing the IPC
+    TestSend
 }
 
 #[derive(Parser, Debug)]
@@ -83,7 +84,7 @@ fn main() {
             start_manager_daemon();
         },
         Command::OpenGui => println!("Opening GUI..."),
-        Command::Send => {
+        Command::TestSend => {
             let mut stream = create_default_stream().unwrap();
 
             send_payload(&mut stream, Payload::Cmd(CmdIPC::Delete(10)));

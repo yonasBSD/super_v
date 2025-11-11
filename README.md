@@ -184,15 +184,16 @@ This will:
 ```
 super_v/
 ├── src/
-│   ├── main.rs                 # CLI entry point
-│   ├── lib.rs                  # Library root
-│   ├── common.rs               # Shared types and errors
-│   ├── history.rs              # ClipboardHistory implementation
+│   ├── main.rs                     # CLI entry point
+│   ├── lib.rs                      # Library root
+│   ├── common.rs                   # Shared types and errors
+│   ├── history.rs                  # ClipboardHistory implementation
 │   ├── services/
 │   │   ├── mod.rs
 │   │   ├── clipboard_manager.rs    # Main daemon manager
 │   │   └── clipboard_ipc_server.rs # IPC communication
-│   └── ydotol.rs               # (Future: keyboard simulation)
+│   ├── gui/                        # (Future: Add GUI)
+│   └── ydotol.rs                   # (Future: keyboard simulation)
 ├── tests/
 │   ├── history_test.rs
 │   └── manager_test.rs
