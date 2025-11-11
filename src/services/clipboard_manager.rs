@@ -268,10 +268,10 @@ impl Manager {
             }));
         }
 
-        fn _send_err(s: &mut UnixStream) {
+        fn _send_err(s: &mut UnixStream, msg: &str) {
             send_payload(s, Payload::Resp(IPCResponse {
                 history_snapshot: None,
-                message: Some("Could not unlock history.".to_string())
+                message: Some(msg.to_string())
             }));
         }
 
@@ -316,7 +316,7 @@ impl Manager {
                                                     _send_snapshot(&mut s, snapshot);
                                                 },
                                                 Err(_) => {
-                                                    _send_err(&mut s);
+                                                    _send_err(&mut s, "Could not unlock history");
                                                 }
                                             }
                                         },
@@ -325,14 +325,19 @@ impl Manager {
                                             match history_for_thread.lock() {
                                                 Ok(mut unlocked_history) => {
                                                     // Delete the item 
-                                                    unlocked_history.delete(pos);
+                                                    match unlocked_history.delete(pos) {
+                                                        Ok(_) => {
+                                                            // Create snapshot, drop guard, send snapshot
+                                                            let snapshot = unlocked_history.clone();
+                                                            _send_snapshot(&mut s, snapshot);
+                                                        },
+                                                        Err(_) => {_send_err(&mut s, "Could not delete item. Index out of bounds.");},
+                                                    };
                                                     
-                                                    // Create snapshot, drop guard, send snapshot
-                                                    let snapshot = unlocked_history.clone();
-                                                    _send_snapshot(&mut s, snapshot);
+                                                    
                                                 },
                                                 Err(_) => {
-                                                    _send_err(&mut s);
+                                                    _send_err(&mut s, "Could not unlock history");
                                                 }
                                             }
                                         },
@@ -341,14 +346,19 @@ impl Manager {
                                             match history_for_thread.lock() {
                                                 Ok(mut unlocked_history) => {
                                                     // Promote the item 
-                                                    unlocked_history.promote(pos);
+                                                    match unlocked_history.promote(pos) {
+                                                        Ok(_) => {
+                                                            // Create snapshot, drop guard, send snapshot
+                                                            let snapshot = unlocked_history.clone();
+                                                            _send_snapshot(&mut s, snapshot);
+                                                        },
+                                                        Err(_) => {_send_err(&mut s, "Could not promote item. Index out of bounds.");},
+                                                    };
 
-                                                    // Create snapshot, drop guard, send snapshot
-                                                    let snapshot = unlocked_history.clone();
-                                                    _send_snapshot(&mut s, snapshot);
+
                                                 },
                                                 Err(_) => {
-                                                    _send_err(&mut s);
+                                                    _send_err(&mut s, "Could not unlock history");
                                                 }
                                             }
                                         },
@@ -362,7 +372,7 @@ impl Manager {
                                                 },
                                                 Err(_) => {
                                                     // Send err if could not unlock
-                                                    _send_err(&mut s);
+                                                    _send_err(&mut s, "Could not unlock history");
                                                 }
                                             }
                                         }
@@ -404,6 +414,8 @@ impl Manager {
             thread::sleep(Duration::from_secs(1));
         }
 
+        println!("Stop signal recieved. Stopping!");
+
         // Shutdown when daemon stops
         self.stop();
     }
@@ -435,7 +447,7 @@ impl Manager {
             if let Some(h) = _command_handle {
                 let _ = h.join();
             }
-        }).join();
+        });
 
         // Unlock the lock file
         // Swallows the error.

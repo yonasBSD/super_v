@@ -18,7 +18,10 @@ use serde::{
 #[allow(unused)]
 pub enum ClipboardError {
     /// Returned when attempting to access an empty clipboard
-    ClipboardEmpty
+    ClipboardEmpty,
+
+    /// Returned when trying to access an item out of bounds.
+    IndexOutOfBound
 }
 
 /// Error Type for Clipboard Manager Daemon
@@ -47,6 +50,9 @@ impl fmt::Display for ClipboardError {
         match self {
             ClipboardError::ClipboardEmpty => {
                 write!(f, "Clipboard is empty. Please add copy something before trying again.")
+            },
+            ClipboardError::IndexOutOfBound => {
+                write!(f, "Item position not found or out-of-bounds.")
             }
         }
     }

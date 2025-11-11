@@ -1,4 +1,3 @@
-use core::panic;
 // Standard Crates
 #[allow(unused)]
 use std::{
@@ -9,7 +8,7 @@ use std::{
 };
 
 // External Crates
-use crate::common::ClipboardItem;
+use crate::common::{ClipboardError, ClipboardItem};
 use serde::{
     Serialize, 
     Deserialize
@@ -76,17 +75,18 @@ impl ClipboardHistory {
     /// # Panics
     /// 
     /// Panics if the position is out of bounds
-    pub fn promote(&mut self, pos: usize) {
+    pub fn promote(&mut self, pos: usize) -> Result<(), ClipboardError>{
         // Remove item as 'pos'th index
-        let promoted_item = match self.history.remove(pos) {
+        match self.history.remove(pos) {
             Some(item) => {
-                self.history.push_front(item)
+                self.history.push_front(item);
+                Ok(())
             },
             None => {
-                // No item found
-                panic!("Item position not found or out-of-bounds.");
+                Err(ClipboardError::IndexOutOfBound)
+                
             },
-        };
+        }
     }
 
 
@@ -99,11 +99,11 @@ impl ClipboardHistory {
     /// # Panics
     /// 
     /// Panics if the position is out of bounds
-    pub fn delete(&mut self, pos: usize) {
+    pub fn delete(&mut self, pos: usize) -> Result<(), ClipboardError> {
         match self.history.remove(pos) {
-            Some(_) => {/* Remove was proper. Nothing to do here... */},
+            Some(_) => {Ok(())},
             None => {
-                panic!("Item position nto found or out-of-bounds.")
+                Err(ClipboardError::IndexOutOfBound)
             }
         }
     }

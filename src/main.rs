@@ -1,6 +1,6 @@
 // Standard Crates
 use std::{
-    process
+    fs::remove_file, process
 };
 
 // External Crates
@@ -20,11 +20,7 @@ use super_v::{
             CmdIPC,
             Payload
         }
-    },
-    common::{
-        ClipboardItem
-    },
-    history::ClipboardHistory
+    }
 };
 
 /*
@@ -44,6 +40,9 @@ enum Command {
 
     /// Open the GUI
     OpenGui,
+
+    /// Cleans any leftovers
+    Clean,
 
     Send
 }
@@ -77,13 +76,6 @@ fn start_manager_daemon() {
 
 // ----------------------------- Main --------------------------------
 fn main() {
-    // History
-    let mut ch = ClipboardHistory::new(20);
-    ch.add(ClipboardItem::Text("miaow".to_string()));
-    ch.add(ClipboardItem::Text("woof".to_string()));
-    ch.add(ClipboardItem::Text("rawr".to_string()));
-    ch.promote(1);
-
     // Daemon
     let args= Args::parse();
     match args.command {
@@ -94,10 +86,14 @@ fn main() {
         Command::Send => {
             let mut stream = create_default_stream().unwrap();
 
-            send_payload(&mut stream, Payload::Cmd(CmdIPC::Delete(1)));
+            send_payload(&mut stream, Payload::Cmd(CmdIPC::Delete(10)));
 
             let resp = read_payload(&mut stream);
             println!("{:?}", resp);
+        },
+        Command::Clean => {
+            let _ = remove_file("/tmp/super_v.sock");
+            let _ = remove_file("/tmp/super_v.lock");
         }
     }
 }

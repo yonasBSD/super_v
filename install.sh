@@ -10,16 +10,19 @@ USERHOME="${HOME}"
 SERVICE_NAME="super_v.service"
 USER_DIR="${USERHOME}/.config/systemd/user"
 USER_PATH="${USER_DIR}/${SERVICE_NAME}"
-PROJECT_DIR="/home/ecstra/Desktop/super_v"
-BINARY_PATH="${PROJECT_DIR}/target/release/super_v"
 USER_LOG="${USERHOME}/superv.log"
 
 # Stop and remove any system service to avoid conflicts (requires sudo)
 echo "[*] removing system service (if present)..."
+sudo rm /usr/local/bin/super_v || echo "super_v cli already removed"
 sudo systemctl stop "${SERVICE_NAME}" 2>/dev/null || true
 sudo systemctl disable "${SERVICE_NAME}" 2>/dev/null || true
 sudo rm -f "/etc/systemd/system/${SERVICE_NAME}" 2>/dev/null || true
 sudo systemctl daemon-reload
+
+echo "[*] Installing service..."
+sudo cp ./target/release/super_v /usr/local/bin/
+sudo chmod +x /usr/local/bin/super_v
 
 # Ensure user unit dir exists
 echo "[*] creating user unit dir..."
@@ -34,13 +37,13 @@ After=graphical-session.target
 
 [Service]
 Type=simple
-WorkingDirectory=${PROJECT_DIR}
 Environment=RUST_BACKTRACE=1
 Environment=RUST_LOG=info
 Environment=DISPLAY=:0
 Environment=XAUTHORITY=/run/user/1000/.mutter-Xwaylandauth.60V7F3
 Environment=XDG_RUNTIME_DIR=/run/user/1000
-ExecStart=${BINARY_PATH} start
+ExecStartPre=/usr/local/bin/super_v clean
+ExecStart=/usr/local/bin/super_v start
 Restart=on-failure
 RestartSec=5
 StandardOutput=append:%h/superv.log

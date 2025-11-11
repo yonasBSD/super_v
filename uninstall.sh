@@ -7,6 +7,7 @@ USER_PATH="${HOME}/.config/systemd/user/${SERVICE_NAME}"
 LOG_FILE="/var/log/superv.log"
 
 echo "[*] Stopping user service (if active)..."
+(sudo rm /usr/local/bin/super_v) || echo "super_v cli already removed"
 systemctl --user stop "${SERVICE_NAME}" 2>/dev/null || true
 systemctl --user disable "${SERVICE_NAME}" 2>/dev/null || true
 
