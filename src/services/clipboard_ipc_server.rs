@@ -40,9 +40,9 @@ pub enum CmdIPC {
 
 /// A data structure representing the Response of IPC.
 /// 
-/// Contains:
+/// **Contains**:
 /// * **history_snapshot** - A snapshot of the current ClipboardHistory from the Clipboard Manager Daemon
-/// * **message** - Optional message.
+/// * **message** - Optional message if there are any errors.
 #[allow(unused)]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct IPCResponse { 
@@ -50,11 +50,22 @@ pub struct IPCResponse {
     pub message: Option<String>
 }
 
+/// A data structure that contains data needed for a payload.
+/// 
+/// **Contains**:
+/// * **buf** - A binary vector of transformed data
+/// * **len** - Length of the buf in u8 as bytes
 pub struct PayloadData {
     buf: Vec<u8>,
     len: [u8; 4]
 }
 
+/// # Payload
+/// These are the available Payloads for the IPC Server.
+/// 
+/// **Available**:
+/// * **Cmd(CmdIPC)** - CmdIPC for giving commands
+/// * **Resp(IPCResponse)** - IPCResponse that contains a snapshot and a message
 #[derive(Debug, Serialize, Deserialize)]
 pub enum Payload {
     Cmd(CmdIPC),
@@ -62,6 +73,7 @@ pub enum Payload {
 }
 
 impl Payload {
+    /// Constructs PayloadData for a given Payload
     fn to_payload(&self) -> PayloadData {
         let mut  buf: Vec<u8> = Vec::new();
         let _ = self.serialize(&mut Serializer::new(&mut buf)).ok();
@@ -77,13 +89,28 @@ impl Payload {
 
 const SOCKET_PATH: &str = "/tmp/super_v.sock";
 
+/// Creates and binds a new Unix domain socket listener at `/tmp/super_v.sock`.
+///
+/// # Behavior
+/// - If an existing server is already bound to the socket path, it returns an error.
+/// - If a stale socket file exists, it removes it before rebinding.
+/// - On success, returns a bound `UnixListener`.
+///
+/// # Errors
+/// - Returns `IPCServerError::BindError` if the socket cannot be bound.
+/// - Returns `IPCServerError::BindError` if an existing IPC server is detected.
+///
+/// # Example
+/// ```no_run
+/// let listener = create_bind().expect("Failed to bind IPC server");
+/// ```
 pub fn create_bind() -> Result<UnixListener, IPCServerError> {
     // Check if we can connect to server.
     // If yes, then server already running and a new server should not start
     let try_conn = create_default_stream();
 
     let Err(IPCServerError::FileNotFound | IPCServerError::ConnectionError(_)) = try_conn else {
-        return Err(IPCServerError::BindError("Server appears to be already running".into()));
+        return Err(IPCServerError::BindError("IPC Server appears to be already running".into()));
     };
 
     // Remove the old sock file
@@ -101,6 +128,21 @@ pub fn create_bind() -> Result<UnixListener, IPCServerError> {
     Ok(listener)
 }
 
+/// Attempts to connect to the default Unix socket at `/tmp/super_v.sock`.
+///
+/// # Behavior
+/// - Returns a connected `UnixStream` if the socket is active.
+/// - Handles typical connection failures with custom `IPCServerError` variants.
+///
+/// # Errors
+/// - Returns `IPCServerError::ConnectionError` if connection is refused.
+/// - Returns `IPCServerError::FileNotFound` if the socket file is missing.
+/// - Returns `IPCServerError::ConnectionError` for any other I/O error.
+///
+/// # Example
+/// ```no_run
+/// let mut stream = create_default_stream().expect("Unable to connect to IPC server");
+/// ```
 pub fn create_default_stream() -> Result<UnixStream, IPCServerError> {
     match UnixStream::connect(SOCKET_PATH) {
         Ok(stream) => {
@@ -126,6 +168,22 @@ pub fn create_default_stream() -> Result<UnixStream, IPCServerError> {
     }
 }
 
+/// Sends a serialized `Payload` over a connected Unix stream.
+///
+/// # Behavior
+/// - Serializes the `Payload` using MessagePack.
+/// - Prepends the payload length (4 bytes, big-endian).
+/// - Sends both the length and serialized data through the stream.
+/// - Flushes the stream to ensure all data is written.
+///
+/// # Panics
+/// - Panics if the stream fails to write or flush.
+///
+/// # Example
+/// ```no_run
+/// let mut stream = create_default_stream().unwrap();
+/// send_payload(&mut stream, Payload::Cmd(CmdIPC::Snapshot));
+/// ```
 pub fn send_payload(stream: &mut UnixStream, item: Payload) {
     // Serialize command
     let payload = item.to_payload();
@@ -144,6 +202,23 @@ pub fn send_payload(stream: &mut UnixStream, item: Payload) {
     stream.flush().unwrap();
 }
 
+/// Reads and deserializes a `Payload` from a connected Unix stream.
+///
+/// # Behavior
+/// - Reads the first 4 bytes as a big-endian `u32` payload length.
+/// - Reads the following bytes as the serialized payload.
+/// - Deserializes the payload into a `Payload` enum instance using MessagePack.
+///
+/// # Panics
+/// - Panics if reading from the stream fails.
+/// - Panics if deserialization fails.
+///
+/// # Example
+/// ```no_run
+/// let mut stream = create_default_stream().unwrap();
+/// let payload = read_payload(&mut stream);
+/// println!("{:?}", payload);
+/// ```
 pub fn read_payload(stream: &mut UnixStream) -> Payload {
     // Read length of message (u32)
     let mut len_buf = [0u8; 4];

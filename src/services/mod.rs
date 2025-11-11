@@ -1,4 +1,3 @@
-// All services needed
-pub mod clipboard_monitor;
+// Daemon Services
 pub mod clipboard_manager;
 pub mod clipboard_ipc_server;
