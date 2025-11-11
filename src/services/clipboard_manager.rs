@@ -1,20 +1,16 @@
 // System Crates
 use std::{
-    sync::{
+    fs::{
+        File,
+        OpenOptions
+    }, io::Write, os::unix::net::{UnixListener, UnixStream}, sync::{
         Arc, 
         Mutex, 
         atomic::{ 
             AtomicBool, 
             Ordering 
         }
-    }, 
-    fs::{
-        File,
-        OpenOptions
-    },
-    thread::{self, JoinHandle, sleep}, 
-    time::Duration,
-    io::Write
+    }, thread::{self, JoinHandle, sleep}, time::Duration
 };
 
 // External Crates
@@ -27,6 +23,14 @@ use crate::{
         ClipboardItem, 
         GetItem,
         DaemonError
+    },
+    services::clipboard_ipc_server::{
+        create_bind,
+        read_payload,
+        send_payload,
+        CmdIPC,
+        IPCResponse,
+        Payload
     },
     history::ClipboardHistory
 };
@@ -55,6 +59,9 @@ pub struct Manager {
 
     // Lock file to prevent multiple starts.
     pub _lock_file: Option<File>,
+
+    // IPC
+    pub _server: UnixListener
 }
 
 impl Manager {
@@ -123,6 +130,14 @@ impl Manager {
         let _ = write!(&lock_file, "{}", std::process::id());
         let _ = lock_file.sync_all();
         
+        // Once file lock is gotten, create a new IPC Server
+        let server = match create_bind().map_err(|err| DaemonError::IPCErr(err)) {
+            Ok(server) => {server},
+            Err(err) => {
+                return Err(err);
+            }
+        };
+
         // Return the manager object
         Ok(Self {
             _clipboard_service: _clipboard_service,
@@ -133,7 +148,11 @@ impl Manager {
             _polling_handle: None,
             _command_handle: None,
 
-            _lock_file: Some(lock_file)
+            // New Listener
+            _lock_file: Some(lock_file),
+
+            // Ipc Server
+            _server: server
         })
     }
 
@@ -183,8 +202,6 @@ impl Manager {
             };
             
             while !stop_signal.load(Ordering::SeqCst) {
-                println!("Checking for changes in clipbaord");
-
                 // Item Checking
                 let current_item = match clipboard_service.try_lock() {
                     Ok(mut unlocked_clipboard) => {
@@ -200,13 +217,12 @@ impl Manager {
                 // So no need for thread-to-thread communication management and can purely focus on IPC management.
                 // Checks if item is new or not.
                 if current_item != last_item {
-                    println!("Change found! Before: \n```\n{}\n```\n\n After: \n```\n{}\n```\n\n", last_item, current_item);
-
                     // Acquire Lock
                     match shared_history.try_lock() {
                         Ok(mut unlocked_history) => {
                             // Add item to history
                             unlocked_history.add(current_item.clone());
+                            println!("Curent History: \n{}\r\n", unlocked_history);
 
                             // Update Last item
                             last_item = current_item
@@ -237,6 +253,134 @@ impl Manager {
     /// - Should store the thread JoinHandle in _command_handle.
     pub fn _command_service(&mut self) {
 
+        // Clone the items needed.
+        let stop_signal = self._stop_signal.clone();
+        let shared_history: Arc<Mutex<ClipboardHistory>> = self._shared_history.clone();
+
+        // Find another way to just own the server instead of cloning.
+        let ipc_server = self._server.try_clone().unwrap();
+
+        // Helper functions to send snapshot and err
+        fn _send_snapshot(s: &mut UnixStream, snapshot: ClipboardHistory) {
+            send_payload(s, Payload::Resp(IPCResponse {
+                history_snapshot: Some(snapshot),
+                message: None
+            }));
+        }
+
+        fn _send_err(s: &mut UnixStream) {
+            send_payload(s, Payload::Resp(IPCResponse {
+                history_snapshot: None,
+                message: Some("Could not unlock history.".to_string())
+            }));
+        }
+
+        // Run the command service in a new thread
+        // The thread will consume the only UnixListener (since it's not an Arc) which is fine
+        // Then it will listen for streams which send CmdIpc as Payload
+        // Parse the Cmd and apply operation on the clipboard history
+        // Finally, send a snapshot of the history
+        self._command_handle = Some(thread::spawn(move || {
+
+            println!("Listening for Commands");
+
+            // Handle incoming messages
+            for stream in ipc_server.incoming() {
+                // Break the loop if stop_signal is found
+                if stop_signal.load(Ordering::SeqCst) {break}
+
+                match stream {
+                    Ok(mut s ) => {
+                        let history_for_thread = shared_history.clone();
+
+                        // Handle payload in another thread
+                        thread::spawn(move || {
+                            // Read the payload
+                            let payload = read_payload(&mut s);
+                            
+                            println!("Recieved Payload: {:?}", payload);
+
+                            // Match the payload and execute command
+                            match payload {
+                                Payload::Cmd(ipc_cmd) => {
+                                    match ipc_cmd {
+                                        CmdIPC::Clear => {
+                                           // Get mutex guard
+                                            match history_for_thread.lock() {
+                                                Ok(mut unlocked_history) => {
+                                                    // Clear the history
+                                                    unlocked_history.clear();
+                                                    
+                                                    // Create snapshot, drop guard, send snapshot
+                                                    let snapshot = unlocked_history.clone();
+                                                    _send_snapshot(&mut s, snapshot);
+                                                },
+                                                Err(_) => {
+                                                    _send_err(&mut s);
+                                                }
+                                            }
+                                        },
+                                        CmdIPC::Delete(pos) => {
+                                           // Get mutex guard
+                                            match history_for_thread.lock() {
+                                                Ok(mut unlocked_history) => {
+                                                    // Delete the item 
+                                                    unlocked_history.delete(pos);
+                                                    
+                                                    // Create snapshot, drop guard, send snapshot
+                                                    let snapshot = unlocked_history.clone();
+                                                    _send_snapshot(&mut s, snapshot);
+                                                },
+                                                Err(_) => {
+                                                    _send_err(&mut s);
+                                                }
+                                            }
+                                        },
+                                        CmdIPC::Promote(pos) => {
+                                            // Get mutex guard
+                                            match history_for_thread.lock() {
+                                                Ok(mut unlocked_history) => {
+                                                    // Promote the item 
+                                                    unlocked_history.promote(pos);
+
+                                                    // Create snapshot, drop guard, send snapshot
+                                                    let snapshot = unlocked_history.clone();
+                                                    _send_snapshot(&mut s, snapshot);
+                                                },
+                                                Err(_) => {
+                                                    _send_err(&mut s);
+                                                }
+                                            }
+                                        },
+                                        CmdIPC::Snapshot => {
+                                            // Get mutex guard
+                                            match history_for_thread.lock() {
+                                                Ok(unlocked_history) => {
+                                                    // Create snapshot, drop guard, send snapshot
+                                                    let snapshot = unlocked_history.clone();
+                                                    _send_snapshot(&mut s, snapshot);
+                                                },
+                                                Err(_) => {
+                                                    // Send err if could not unlock
+                                                    _send_err(&mut s);
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                Payload::Resp(_) => {
+                                    eprintln!("Wrong Payload type recieved. Expected CmdIpc but got IPCResponse.")
+                                }
+                            }
+                        });
+                    },
+                    Err(e) => {
+                        eprintln!("Accept Error: {e}");
+                    },
+                }
+            }
+            
+        }));
     }
     
     /// Start all configured background services.

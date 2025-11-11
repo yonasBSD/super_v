@@ -89,6 +89,25 @@ impl ClipboardHistory {
         };
     }
 
+
+    /// Delets an item at the given position from history.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `pos` - The index of the item to delete
+    /// 
+    /// # Panics
+    /// 
+    /// Panics if the position is out of bounds
+    pub fn delete(&mut self, pos: usize) {
+        match self.history.remove(pos) {
+            Some(_) => {/* Remove was proper. Nothing to do here... */},
+            None => {
+                panic!("Item position nto found or out-of-bounds.")
+            }
+        }
+    }
+
     /// Returns a reference to all items in the clipboard history.
     /// 
     /// Items are ordered from most recent (front) to oldest (back).

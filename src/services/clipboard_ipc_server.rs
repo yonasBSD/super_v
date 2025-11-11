@@ -46,8 +46,8 @@ pub enum CmdIPC {
 #[allow(unused)]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct IPCResponse { 
-    history_snapshot: ClipboardHistory,
-    message: Option<String>
+    pub history_snapshot: Option<ClipboardHistory>,
+    pub message: Option<String>
 }
 
 pub struct PayloadData {
@@ -66,7 +66,7 @@ impl Payload {
         let mut  buf: Vec<u8> = Vec::new();
         let _ = self.serialize(&mut Serializer::new(&mut buf)).ok();
         let payload_len: [u8; 4] = (buf.len() as u32).to_be_bytes();
-
+        
         PayloadData { 
             buf: buf,
             len: payload_len
@@ -77,7 +77,18 @@ impl Payload {
 
 const SOCKET_PATH: &str = "/tmp/super_v.sock";
 
-pub fn start() -> Result<UnixListener, IPCServerError> {
+pub fn create_bind() -> Result<UnixListener, IPCServerError> {
+    // Check if we can connect to server.
+    // If yes, then server already running and a new server should not start
+    let try_conn = create_default_stream();
+
+    let Err(IPCServerError::FileNotFound | IPCServerError::ConnectionError(_)) = try_conn else {
+        return Err(IPCServerError::BindError("Server appears to be already running".into()));
+    };
+
+    // Remove the old sock file
+    let _ = remove_file(SOCKET_PATH);
+
     // Create a new listener
     let listener = match UnixListener::bind(SOCKET_PATH) {
         Ok(listener) => {listener},
@@ -90,18 +101,32 @@ pub fn start() -> Result<UnixListener, IPCServerError> {
     Ok(listener)
 }
 
-pub fn default_stream() -> Result<UnixStream, IPCServerError> {
+pub fn create_default_stream() -> Result<UnixStream, IPCServerError> {
     match UnixStream::connect(SOCKET_PATH) {
         Ok(stream) => {
             Ok(stream)
         },
         Err(err) => {
-            Err(IPCServerError::ConnectionError(format!("{:?}", err)))
+            if let Some(err_code) = err.raw_os_error() {
+                match err_code {
+                    111 => {
+                        Err(IPCServerError::ConnectionError("Connection Refused by server.".into()))
+                    },
+                    2 => {
+                        Err(IPCServerError::FileNotFound)
+                    }
+                    _ => {
+                        Err(IPCServerError::ConnectionError(String::from(format!("{:?}", err))))
+                    }
+                }
+            } else {
+                Err(IPCServerError::ConnectionError(String::from(format!("{:?}", err))))
+            }
         }
     }
 }
 
-pub fn send_payload(mut stream: UnixStream, item: Payload) {
+pub fn send_payload(stream: &mut UnixStream, item: Payload) {
     // Serialize command
     let payload = item.to_payload();
 
@@ -119,7 +144,7 @@ pub fn send_payload(mut stream: UnixStream, item: Payload) {
     stream.flush().unwrap();
 }
 
-pub fn read_payload(mut stream: UnixStream) -> Payload {
+pub fn read_payload(stream: &mut UnixStream) -> Payload {
     // Read length of message (u32)
     let mut len_buf = [0u8; 4];
     stream.read_exact(&mut len_buf).unwrap();

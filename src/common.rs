@@ -26,13 +26,16 @@ pub enum ClipboardError {
 #[allow(unused)]
 pub enum DaemonError {
     /// Returned when attempting to spawn Manager but an instance is already running.
-    ManagerMultiSpawn
+    ManagerMultiSpawn,
+
+    IPCErr(IPCServerError)
 }
 
 /// Error Type for IPCServer
 #[derive(Debug, PartialEq)]
 #[allow(unused)]
 pub enum IPCServerError {
+    FileNotFound,
     ConnectionError(String),
     BindError(String),
     SendError(String),
@@ -54,6 +57,9 @@ impl fmt::Display for DaemonError {
         match self {
             DaemonError::ManagerMultiSpawn => {
                 write!(f, "An instance of the Manager is already open.")
+            },
+            DaemonError::IPCErr(ipc_error) => {
+                write!(f, "IPC Error: {}", ipc_error)
             }
         }
     }
@@ -70,6 +76,9 @@ impl fmt::Display for IPCServerError {
             },
             IPCServerError::SendError(string) => {
                 write!(f, "Could not send item: {}", string)
+            }
+            IPCServerError::FileNotFound => {
+                write!(f, "Sock file is missing?")
             }
         }
     }

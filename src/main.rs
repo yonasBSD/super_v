@@ -28,8 +28,6 @@ use clap::{
     Subcommand
 };
 
-use rmp_serde::Serializer;
-use serde::Serialize;
 // My Crates
 #[allow(unused)]
 use super_v::{
@@ -37,7 +35,10 @@ use super_v::{
         clipboard_monitor::Monitor,
         clipboard_manager::Manager,
         clipboard_ipc_server::{
-            self,
+            create_bind,
+            read_payload,
+            send_payload,
+            create_default_stream,
             CmdIPC,
             IPCResponse,
             Payload
@@ -96,37 +97,15 @@ fn start_manager_daemon() {
 
     c_manager.start_daemon();
 }
-fn ipc_server() {
-    thread::spawn(|| {
-        let listener = clipboard_ipc_server::start().unwrap();
-        println!("Listening!");
-
-        // Handle incoming messages
-        for stream in listener.incoming() {
-            match stream {
-                Ok(s) => {
-                    thread::spawn(|| {
-                        let p = clipboard_ipc_server::read_payload(s);
-                        println!("{:?}", p);
-                    });
-                },
-                Err(e) => {
-                    eprintln!("Accept Error: {e}");
-                }
-            }
-        }
-    });
-}
 
 // ----------------------------- Main --------------------------------
 fn main() {
     // History
-    // let mut ch = ClipboardHistory::new(20);
-    // ch.add(ClipboardItem::Text("miaow".to_string()));
-    // ch.add(ClipboardItem::Text("woof".to_string()));
-    // ch.add(ClipboardItem::Text("rawr".to_string()));
-    // ch.promote(1);
-    // println!("{ch}");
+    let mut ch = ClipboardHistory::new(20);
+    ch.add(ClipboardItem::Text("miaow".to_string()));
+    ch.add(ClipboardItem::Text("woof".to_string()));
+    ch.add(ClipboardItem::Text("rawr".to_string()));
+    ch.promote(1);
 
     // // Monitor
     // let clipboard = Clipboard::new().unwrap();
@@ -140,9 +119,8 @@ fn main() {
     let args= Args::parse();
     match args.command {
         Command::Start => {
-            // start_manager_daemon();
+            start_manager_daemon();
             // println!("Disabled for debug!");
-            ipc_server();
 
             // Clone a stop signal
             let daemon_stop_signal = Arc::new(AtomicBool::new(false));
@@ -157,11 +135,15 @@ fn main() {
             while !daemon_stop_signal.load(Ordering::SeqCst) {
                 thread::sleep(Duration::from_secs(1));
             }
-
         },
         Command::OpenGui => println!("Opening GUI..."),
         Command::Send => {
-            clipboard_ipc_server::send_payload(clipboard_ipc_server::default_stream().unwrap(), Payload::Cmd(CmdIPC::Delete(20)));
+            let mut stream = create_default_stream().unwrap();
+
+            send_payload(&mut stream, Payload::Cmd(CmdIPC::Delete(5)));
+
+            let resp = read_payload(&mut stream);
+            println!("{:?}", resp);
         }
     }
 }
