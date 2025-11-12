@@ -36,12 +36,13 @@ use crate::{
 /// * **Snapshot** - Command that retrieves the snapshot of the current Clipboard History
 /// * **Clear** - Command that clears the entire clipboard History.
 #[allow(unused)]
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum CmdIPC {
     Promote(usize),
     Delete(usize),
     Snapshot,
     Clear,
+    Stop
 }
 
 /// A data structure representing the Response of IPC.
@@ -54,6 +55,21 @@ pub enum CmdIPC {
 pub struct IPCResponse { 
     pub history_snapshot: Option<ClipboardHistory>,
     pub message: Option<String>
+}
+
+#[allow(unused)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IPCRequest {
+    pub cmd: CmdIPC
+}
+
+impl Default for IPCResponse {
+    fn default() -> Self {
+        Self {
+            history_snapshot: None,
+            message: None
+        }
+    }
 }
 
 /// A data structure that contains data needed for a payload.
@@ -74,8 +90,8 @@ pub struct PayloadData {
 /// * **Resp(IPCResponse)** - IPCResponse that contains a snapshot and a message
 #[derive(Debug, Serialize, Deserialize)]
 pub enum Payload {
-    Cmd(CmdIPC),
-    Resp(IPCResponse),
+    Request(IPCRequest),
+    Response(IPCResponse),
 }
 
 impl Payload {
@@ -187,9 +203,9 @@ pub fn create_default_stream() -> Result<UnixStream, IPCServerError> {
 ///
 /// # Example
 /// ```no_run
-/// use super_v::services::clipboard_ipc_server::{create_default_stream, send_payload, Payload, CmdIPC};
+/// use super_v::services::clipboard_ipc_server::{create_default_stream, send_payload, Payload, CmdIPC, IPCRequest};
 /// let mut stream = create_default_stream().unwrap();
-/// send_payload(&mut stream, Payload::Cmd(CmdIPC::Snapshot));
+/// send_payload(&mut stream, Payload::Request(IPCRequest{cmd: CmdIPC::Clear}));
 /// ```
 pub fn send_payload(stream: &mut UnixStream, item: Payload) {
     // Serialize command

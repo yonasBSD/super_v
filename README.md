@@ -61,6 +61,7 @@ chmod +x install.sh
 ./install.sh
 
 # Alternatively, install as dpkg (system-wide. Needs sudo)
+strip target/release/super_v
 cargo deb --no-build
 sudo dpkg -i ./target/debian/super-v_0.1.0-1_amd64.deb 
 ```

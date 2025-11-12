@@ -269,7 +269,7 @@ impl Manager {
     pub fn _command_service(&mut self) {
 
         // Clone the items needed.
-        let stop_signal = self._stop_signal.clone();
+        let stop_signal_reader = self._stop_signal.clone();
         let shared_history: Arc<Mutex<ClipboardHistory>> = self._shared_history.clone();
 
         // Find another way to just own the server instead of cloning.
@@ -277,14 +277,14 @@ impl Manager {
 
         // Helper functions to send snapshot and err
         fn _send_snapshot(s: &mut UnixStream, snapshot: ClipboardHistory) {
-            send_payload(s, Payload::Resp(IPCResponse {
+            send_payload(s, Payload::Response(IPCResponse {
                 history_snapshot: Some(snapshot),
                 message: None
             }));
         }
 
-        fn _send_err(s: &mut UnixStream, msg: &str) {
-            send_payload(s, Payload::Resp(IPCResponse {
+        fn _send_msg(s: &mut UnixStream, msg: &str) {
+            send_payload(s, Payload::Response(IPCResponse {
                 history_snapshot: None,
                 message: Some(msg.to_string())
             }));
@@ -302,7 +302,8 @@ impl Manager {
             // Handle incoming messages
             for stream in ipc_server.incoming() {
                 // Break the loop if stop_signal is found
-                if stop_signal.load(Ordering::SeqCst) {break}
+                let stop_signal_writer = stop_signal_reader.clone();
+                if stop_signal_reader.load(Ordering::SeqCst) {break}
 
                 match stream {
                     Ok(mut s ) => {
@@ -317,8 +318,8 @@ impl Manager {
 
                             // Match the payload and execute command
                             match payload {
-                                Payload::Cmd(ipc_cmd) => {
-                                    match ipc_cmd {
+                                Payload::Request(ipc_request) => {
+                                    match ipc_request.cmd {
                                         CmdIPC::Clear => {
                                            // Get mutex guard
                                             match history_for_thread.lock() {
@@ -331,7 +332,7 @@ impl Manager {
                                                     _send_snapshot(&mut s, snapshot);
                                                 },
                                                 Err(_) => {
-                                                    _send_err(&mut s, "Could not unlock history");
+                                                    _send_msg(&mut s, "Could not unlock history");
                                                 }
                                             }
                                         },
@@ -346,13 +347,13 @@ impl Manager {
                                                             let snapshot = unlocked_history.clone();
                                                             _send_snapshot(&mut s, snapshot);
                                                         },
-                                                        Err(_) => {_send_err(&mut s, "Could not delete item. Index out of bounds.");},
+                                                        Err(_) => {_send_msg(&mut s, "Could not delete item. Index out of bounds.");},
                                                     };
                                                     
                                                     
                                                 },
                                                 Err(_) => {
-                                                    _send_err(&mut s, "Could not unlock history");
+                                                    _send_msg(&mut s, "Could not unlock history");
                                                 }
                                             }
                                         },
@@ -367,11 +368,11 @@ impl Manager {
                                                             let snapshot = unlocked_history.clone();
                                                             _send_snapshot(&mut s, snapshot);
                                                         },
-                                                        Err(_) => {_send_err(&mut s, "Could not promote item. Index out of bounds.");},
+                                                        Err(_) => {_send_msg(&mut s, "Could not promote item. Index out of bounds.");},
                                                     };
                                                 },
                                                 Err(_) => {
-                                                    _send_err(&mut s, "Could not unlock history");
+                                                    _send_msg(&mut s, "Could not unlock history");
                                                 }
                                             }
                                         },
@@ -385,14 +386,18 @@ impl Manager {
                                                 },
                                                 Err(_) => {
                                                     // Send err if could not unlock
-                                                    _send_err(&mut s, "Could not unlock history");
+                                                    _send_msg(&mut s, "Could not unlock history");
                                                 }
                                             }
+                                        },
+                                        CmdIPC::Stop => {
+                                            stop_signal_writer.store(true, Ordering::SeqCst);
+                                            _send_msg(&mut s, "Stop Signal recieved.");
                                         }
                                     }
                                 },
-                                Payload::Resp(_) => {
-                                    _send_err(&mut s, "Wrong Payload type recieved. Expected CmdIpc but got IPCResponse.");
+                                Payload::Response(_) => {
+                                    _send_msg(&mut s, "Wrong Payload type recieved. Expected CmdIpc but got IPCResponse.");
                                 }
                             }
                         });

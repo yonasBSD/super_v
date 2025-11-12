@@ -48,6 +48,7 @@ pub enum IPCServerError {
     ConnectionError(String),
     BindError(String),
     SendError(String),
+    RecieveError(String),
 }
 
 // Displays for the Errors
@@ -88,7 +89,10 @@ impl fmt::Display for IPCServerError {
             },
             IPCServerError::SendError(string) => {
                 write!(f, "Could not send item: {}", string)
-            }
+            },
+            IPCServerError::RecieveError(string) => {
+                write!(f, "Could not recieve item: {}", string)
+            },
             IPCServerError::FileNotFound => {
                 write!(f, "Sock file is missing?")
             }

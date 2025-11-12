@@ -46,10 +46,7 @@ enum Command {
     OpenGui,
 
     /// Cleans any leftovers
-    Clean,
-
-    // Used for testing the IPC
-    TestSend
+    Clean
 }
 
 #[derive(Parser, Debug)]
@@ -87,14 +84,14 @@ fn main() {
         Command::Start => {
             start_manager_daemon();
         },
-        Command::OpenGui => println!("Opening GUI..."),
-        Command::TestSend => {
-            let mut stream = create_default_stream().unwrap();
+        Command::OpenGui => {
+            // let mut stream = create_default_stream().unwrap();
 
-            send_payload(&mut stream, Payload::Cmd(CmdIPC::Delete(10)));
+            // send_payload(&mut stream, Payload::Cmd(CmdIPC::Stop));
 
-            let resp = read_payload(&mut stream);
-            println!("{:?}", resp);
+            // println!("Trying to see if there is something...");
+            // let resp = read_payload(&mut stream);
+            // println!("{:?}", resp);
         },
         Command::Clean => {
             let _ = remove_file(SOCKET_PATH);

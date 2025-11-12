@@ -19,12 +19,7 @@ mod clipboard_manager_test {
         }, 
         services::{
             clipboard_ipc_server::{
-                CmdIPC, 
-                IPCResponse, 
-                Payload, 
-                create_default_stream, 
-                read_payload, 
-                send_payload
+                CmdIPC, IPCRequest, IPCResponse, Payload, create_default_stream, read_payload, send_payload
             }, 
             clipboard_manager::Manager
         }
@@ -36,9 +31,9 @@ mod clipboard_manager_test {
         let item2 = ClipboardItem::Text("item2".into());
         let item3 = ClipboardItem::Text("item3".into());
         let image = ClipboardItem::Image {
-            width: 50,
-            height: 50,
-            bytes: vec![0u8; 10000],
+            width: 1,
+            height: 1,
+            bytes: vec![0u8; 4],
         };
         vec![item1, item2, item3, image]
     }
@@ -52,13 +47,14 @@ mod clipboard_manager_test {
         // Create a new clipboard instance and update it with items
         // Since Clipboard is synced across device, updating it here should update the manager as well
         let mut clipboard_service = Clipboard::new().unwrap();
+        thread::sleep(Duration::from_millis(250));
 
         // Update the clipboard history to have some things...
         let _ = clipboard_service.set_image(
             ImageData {
-                width: 50,
-                height: 50,
-                bytes: Cow::from([0u8; 10000].as_ref()),
+                width: 1,
+                height: 1,
+                bytes: Cow::from([0u8; 4].as_ref()),
             }
         );
         thread::sleep(Duration::from_millis(250));
@@ -92,7 +88,7 @@ mod clipboard_manager_test {
     }
 
     fn check_payload_message(payload: Payload, checker: &str) {
-        if let Payload::Resp(returned_response) = payload {
+        if let Payload::Response(returned_response) = payload {
             assert_eq!(returned_response.message, Some(checker.to_string()));
         } else {
             panic!("Returned payload type was not correct?");
@@ -100,7 +96,7 @@ mod clipboard_manager_test {
     }
 
     fn check_payload_history(payload: Payload, checker: Vec<ClipboardItem>) {
-        if let Payload::Resp(returned_response) = payload {
+        if let Payload::Response(returned_response) = payload {
 
             match returned_response.history_snapshot {
                 Some(clipboard_history) => {
@@ -196,14 +192,20 @@ mod clipboard_manager_test {
     #[test]
     #[serial]
     fn test_poller_clipboard_history_and_snapshot() {
-        let recieved_payload = beam_payload(Payload::Cmd(CmdIPC::Snapshot)); // <- Should return snapshot of the history
+        let recieved_payload = beam_payload(
+            Payload::Request(
+                IPCRequest {
+                    cmd: CmdIPC::Snapshot
+                }
+            )
+        ); // <- Should return snapshot of the history
         check_payload_history(recieved_payload, get_hopeful_history());
     }
 
     #[test]
     #[serial]
     fn test_invalid_ipc_command() {
-        let recieved_payload = beam_payload(Payload::Resp(IPCResponse{
+        let recieved_payload = beam_payload(Payload::Response(IPCResponse{
             history_snapshot: None,
             message: None
         }));
@@ -214,21 +216,39 @@ mod clipboard_manager_test {
     #[test]
     #[serial]
     fn test_promote_out_of_bound() {
-        let recieved_payload = beam_payload(Payload::Cmd(CmdIPC::Promote(100))); // <- 100 should exceed 0... cuz history empty...
+        let recieved_payload = beam_payload(
+            Payload::Request(
+                IPCRequest {
+                    cmd: CmdIPC::Promote(100) // <- 100 should exceed 0... cuz history empty...
+                }
+            )
+        );
         check_payload_message(recieved_payload, "Could not promote item. Index out of bounds.");
     }
 
     #[test]
     #[serial]
     fn test_delete_out_of_bound() {
-        let recieved_payload = beam_payload(Payload::Cmd(CmdIPC::Delete(100))); // <- 100 should exceed 0... cuz history empty...
+        let recieved_payload = beam_payload(
+            Payload::Request(
+                IPCRequest {
+                    cmd: CmdIPC::Delete(100) // <- 100 should exceed 0... cuz history empty...
+                }
+            )
+        );
         check_payload_message(recieved_payload, "Could not delete item. Index out of bounds.");
     }
 
     #[test]
     #[serial]
     fn test_promote_command() {
-        let recieved_payload = beam_payload(Payload::Cmd(CmdIPC::Promote(1))); // 1,2,3,i -> 2,1,3,i
+        let recieved_payload = beam_payload(
+            Payload::Request(
+                IPCRequest {
+                    cmd: CmdIPC::Promote(1) // 1,2,3,i -> 2,1,3,i
+                }
+            )
+        );
 
         let mut hopeful_history = get_hopeful_history();
         hopeful_history.swap(0, 1);
@@ -239,7 +259,13 @@ mod clipboard_manager_test {
     #[test]
     #[serial]
     fn test_delete_command() {
-        let recieved_payload = beam_payload(Payload::Cmd(CmdIPC::Delete(0))); // 1,2,3,i -> 2,3,i
+        let recieved_payload = beam_payload(
+            Payload::Request(
+                IPCRequest {
+                    cmd: CmdIPC::Delete(0) // 1,2,3,i -> 2,3,i
+                }
+            )
+        );
 
         let mut hopeful_history = get_hopeful_history();
         hopeful_history.remove(0);
@@ -250,7 +276,14 @@ mod clipboard_manager_test {
     #[test]
     #[serial]
     fn test_clear_command() {
-        let recieved_payload = beam_payload(Payload::Cmd(CmdIPC::Clear)); // 1,2,3,i -> []
+        let recieved_payload = beam_payload(
+            Payload::Request(
+                IPCRequest {
+                    cmd: CmdIPC::Clear // 1,2,3,i -> []
+                }
+            )
+        );
+
         check_payload_history(recieved_payload, vec![]);
     }
 }
