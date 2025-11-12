@@ -3,6 +3,7 @@ set -euo pipefail
 
 # build the project as release 
 cargo build --release
+strip target/release/super_v
 
 # Config
 USERNAME="$(id -un)"
