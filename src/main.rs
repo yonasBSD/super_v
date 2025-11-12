@@ -120,7 +120,9 @@ fn refresh_items(items_box: &gtk::Box, window: &gtk::ApplicationWindow, persiste
             
             if let ClipboardItem::Text(text) = &item_for_thread {
                 if let Ok(mut clipboard) = clipboard_for_thread.lock() {
-                    let _ = clipboard.set_text(text);
+                    if !text.trim().is_empty() {
+                        let _ = clipboard.set_text(text);
+                    }
                 }
             }
             
@@ -178,7 +180,6 @@ fn build_ui(app: &Application) {
     // Changables
     const WIDTH      : i32    = 360;
     const HEIGHT     : i32    = 400;
-    const OPACITY    : f64    = 0.6;
 
     // Flags
     const TOP_PANEL  : bool   = false;
@@ -186,7 +187,6 @@ fn build_ui(app: &Application) {
 
     // Apply the settings
     window.set_default_size(WIDTH, HEIGHT);
-    window.set_opacity(OPACITY);
 
     window.set_decorated(TOP_PANEL);
     window.set_modal(MODAL);
