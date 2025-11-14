@@ -1,28 +1,14 @@
 // System Crates
 use std::{
-    fs::{
-        File,
-        OpenOptions, 
-        remove_file
-    }, 
-    io::Write, 
-    os::unix::net::{
-        UnixListener, 
-        UnixStream
-    }, 
+    fs::{File, OpenOptions, remove_file},
+    io::Write,
+    os::unix::net::{UnixListener, UnixStream},
     sync::{
-        Arc, 
-        Mutex, 
-        atomic::{ 
-            AtomicBool, 
-            Ordering 
-        }
-    }, thread::{
-        self, 
-        JoinHandle, 
-        sleep
-    }, 
-    time::Duration
+        Arc, Mutex,
+        atomic::{AtomicBool, Ordering},
+    },
+    thread::{self, JoinHandle, sleep},
+    time::Duration,
 };
 
 // External Crates
@@ -31,22 +17,11 @@ use fs2::FileExt;
 
 // My Crates
 use crate::{
-    common::{ 
-        ClipboardItem, 
-        GetItem,
-        DaemonError,
-        LOCK_PATH,
-        SOCKET_PATH
-    },
+    common::{ClipboardItem, DaemonError, GetItem, LOCK_PATH, SOCKET_PATH},
+    history::ClipboardHistory,
     services::clipboard_ipc_server::{
-        create_bind,
-        read_payload,
-        send_payload,
-        CmdIPC,
-        IPCResponse,
-        Payload
+        CmdIPC, IPCResponse, Payload, create_bind, read_payload, send_payload,
     },
-    history::ClipboardHistory
 };
 
 /// # Manager
@@ -65,7 +40,7 @@ pub struct Manager {
     // Needed for operation
     pub _clipboard_service: Arc<Mutex<Clipboard>>,
     pub _shared_history: Arc<Mutex<ClipboardHistory>>,
-    pub _stop_signal:Arc<AtomicBool>,
+    pub _stop_signal: Arc<AtomicBool>,
 
     // Thread handles
     pub _polling_handle: Option<JoinHandle<()>>,
@@ -75,7 +50,7 @@ pub struct Manager {
     pub _lock_file: Option<File>,
 
     // IPC
-    pub _server: UnixListener
+    pub _server: UnixListener,
 }
 
 impl Manager {
@@ -98,27 +73,21 @@ impl Manager {
     /// - A fully constructed Manager with no active thread handles.
     pub fn new() -> Result<Self, DaemonError> {
         // New history
-        let _shared_history: Arc<Mutex<ClipboardHistory>> = Arc::new(
-            Mutex::new(
-                ClipboardHistory::new(Self::CLIPBOARD_SIZE)
-            )
-        );
+        let _shared_history: Arc<Mutex<ClipboardHistory>> =
+            Arc::new(Mutex::new(ClipboardHistory::new(Self::CLIPBOARD_SIZE)));
 
         // Clipboard service
-        let _clipboard_service: Arc<Mutex<Clipboard>> = Arc::new(
-            Mutex::new(
-                match Clipboard::new() {
-                    Ok(clipboard) => {clipboard},
-                    Err(err) => {
-                        panic!("ERROR: {:?}", err);
-                    }
+        let _clipboard_service: Arc<Mutex<Clipboard>> =
+            Arc::new(Mutex::new(match Clipboard::new() {
+                Ok(clipboard) => clipboard,
+                Err(err) => {
+                    panic!("ERROR: {:?}", err);
                 }
-            )
-        );
+            }));
 
         // Stop signal
         let _stop_signal: Arc<AtomicBool> = Arc::new(AtomicBool::new(false));
-        
+
         // Setup ctrl+c
         let ss_clone = _stop_signal.clone();
         let _ = ctrlc::set_handler(move || {
@@ -143,7 +112,7 @@ impl Manager {
         let _ = lock_file.set_len(0);
         let _ = write!(&lock_file, "{}", std::process::id());
         let _ = lock_file.sync_all();
-        
+
         // Once file lock is gotten, create a new IPC Server
         // But first clear the previous sock file. Since we know we are the main owner of the manager.
         let _ = remove_file(SOCKET_PATH);
@@ -163,7 +132,7 @@ impl Manager {
             _lock_file: Some(lock_file),
 
             // Ipc Server
-            _server
+            _server,
         })
     }
 
@@ -203,25 +172,21 @@ impl Manager {
 
             // Get the current item in clipboard. This will be compared with and edited
             let mut last_item = match clipboard_service.try_lock() {
-                Ok(mut unlocked_clipboard) => {
-                    match unlocked_clipboard.get_item() {
-                        Ok(item) => {item},
-                        Err(_) => {empty_item.clone()},
-                    }
+                Ok(mut unlocked_clipboard) => match unlocked_clipboard.get_item() {
+                    Ok(item) => item,
+                    Err(_) => empty_item.clone(),
                 },
-                Err(_) => {empty_item.clone()},
+                Err(_) => empty_item.clone(),
             };
-            
+
             while !stop_signal.load(Ordering::SeqCst) {
                 // Item Checking
                 let current_item = match clipboard_service.try_lock() {
-                    Ok(mut unlocked_clipboard) => {
-                        match unlocked_clipboard.get_item() {
-                            Ok(item) => {item},
-                            Err(_) => {empty_item.clone()},
-                        }
+                    Ok(mut unlocked_clipboard) => match unlocked_clipboard.get_item() {
+                        Ok(item) => item,
+                        Err(_) => empty_item.clone(),
                     },
-                    Err(_) => {empty_item.clone()},
+                    Err(_) => empty_item.clone(),
                 };
 
                 // This should be fine since _polling_service and _command_service both exist in the same process.
@@ -243,12 +208,12 @@ impl Manager {
                                 // Add item to history
                                 unlocked_history.add(current_item.clone());
                                 println!("Curent History: \n{}\r\n", unlocked_history);
-                                
+
                                 // Update the last item within this
                                 last_item = current_item
                                 // So last item wont be written if mutex fails
-                            },
-                            Err(_) => {/* Failed To Get Lock, Skip */},
+                            }
+                            Err(_) => { /* Failed To Get Lock, Skip */ }
                         }
                     }
                     // else: It's an empty text item, so we skip adding it.
@@ -275,7 +240,6 @@ impl Manager {
     /// - This service runs concurrently and in the same process with the clipboard polling thread (or it won't work).
     /// - Should store the thread JoinHandle in _command_handle.
     pub fn _command_service(&mut self) {
-
         // Clone the items needed.
         let stop_signal_reader = self._stop_signal.clone();
         let shared_history: Arc<Mutex<ClipboardHistory>> = self._shared_history.clone();
@@ -285,17 +249,23 @@ impl Manager {
 
         // Helper functions to send snapshot and err
         fn _send_snapshot(s: &mut UnixStream, snapshot: ClipboardHistory) {
-            send_payload(s, Payload::Response(IPCResponse {
-                history_snapshot: Some(snapshot),
-                message: None
-            }));
+            send_payload(
+                s,
+                Payload::Response(IPCResponse {
+                    history_snapshot: Some(snapshot),
+                    message: None,
+                }),
+            );
         }
 
         fn _send_msg(s: &mut UnixStream, msg: &str) {
-            send_payload(s, Payload::Response(IPCResponse {
-                history_snapshot: None,
-                message: Some(msg.to_string())
-            }));
+            send_payload(
+                s,
+                Payload::Response(IPCResponse {
+                    history_snapshot: None,
+                    message: Some(msg.to_string()),
+                }),
+            );
         }
 
         // Run the command service in a new thread
@@ -304,17 +274,18 @@ impl Manager {
         // Parse the Cmd and apply operation on the clipboard history
         // Finally, send a snapshot of the history
         self._command_handle = Some(thread::spawn(move || {
-
             println!("Listening for Commands");
 
             // Handle incoming messages
             for stream in ipc_server.incoming() {
                 // Break the loop if stop_signal is found
                 let stop_signal_writer = stop_signal_reader.clone();
-                if stop_signal_reader.load(Ordering::SeqCst) {break}
+                if stop_signal_reader.load(Ordering::SeqCst) {
+                    break;
+                }
 
                 match stream {
-                    Ok(mut s ) => {
+                    Ok(mut s) => {
                         let history_for_thread = shared_history.clone();
 
                         // Handle payload in another thread
@@ -328,58 +299,64 @@ impl Manager {
                                 Payload::Request(ipc_request) => {
                                     match ipc_request.cmd {
                                         CmdIPC::Clear => {
-                                           // Get mutex guard
+                                            // Get mutex guard
                                             match history_for_thread.lock() {
                                                 Ok(mut unlocked_history) => {
                                                     // Clear the history
                                                     unlocked_history.clear();
-                                                    
+
                                                     // Create snapshot, drop guard, send snapshot
                                                     let snapshot = unlocked_history.clone();
                                                     _send_snapshot(&mut s, snapshot);
-                                                },
+                                                }
                                                 Err(_) => {
                                                     _send_msg(&mut s, "Could not unlock history");
                                                 }
                                             }
-                                        },
+                                        }
                                         CmdIPC::Delete(pos) => {
-                                           // Get mutex guard
+                                            // Get mutex guard
                                             match history_for_thread.lock() {
                                                 Ok(mut unlocked_history) => {
-                                                    // Delete the item 
+                                                    // Delete the item
                                                     match unlocked_history.delete(pos) {
                                                         Ok(_) => {
                                                             // Create snapshot, drop guard, send snapshot
                                                             let snapshot = unlocked_history.clone();
                                                             _send_snapshot(&mut s, snapshot);
-                                                        },
-                                                        Err(_) => {_send_msg(&mut s, "Could not delete item. Index out of bounds.");},
+                                                        }
+                                                        Err(_) => {
+                                                            _send_msg(
+                                                                &mut s,
+                                                                "Could not delete item. Index out of bounds.",
+                                                            );
+                                                        }
                                                     };
-                                                    
-                                                    
-                                                },
+                                                }
                                                 Err(_) => {
                                                     _send_msg(&mut s, "Could not unlock history");
                                                 }
                                             }
-                                        },
+                                        }
                                         CmdIPC::DeleteThis(item) => {
                                             // Get mutex guard
                                             match history_for_thread.lock() {
                                                 Ok(mut unlocked_history) => {
-                                                    // Delete the item 
+                                                    // Delete the item
                                                     match unlocked_history.delete_this(item) {
                                                         Ok(_) => {
                                                             // Create snapshot, drop guard, send snapshot
                                                             let snapshot = unlocked_history.clone();
                                                             _send_snapshot(&mut s, snapshot);
-                                                        },
-                                                        Err(_) => {_send_msg(&mut s, "Could not delete item. Index out of bounds.");},
+                                                        }
+                                                        Err(_) => {
+                                                            _send_msg(
+                                                                &mut s,
+                                                                "Could not delete item. Index out of bounds.",
+                                                            );
+                                                        }
                                                     };
-                                                    
-                                                    
-                                                },
+                                                }
                                                 Err(_) => {
                                                     _send_msg(&mut s, "Could not unlock history");
                                                 }
@@ -389,21 +366,26 @@ impl Manager {
                                             // Get mutex guard
                                             match history_for_thread.lock() {
                                                 Ok(mut unlocked_history) => {
-                                                    // Promote the item 
+                                                    // Promote the item
                                                     match unlocked_history.promote(pos) {
                                                         Ok(_) => {
                                                             // Create snapshot, drop guard, send snapshot
                                                             let snapshot = unlocked_history.clone();
                                                             _send_snapshot(&mut s, snapshot);
-                                                        },
-                                                        Err(_) => {_send_msg(&mut s, "Could not promote item. Index out of bounds.");},
+                                                        }
+                                                        Err(_) => {
+                                                            _send_msg(
+                                                                &mut s,
+                                                                "Could not promote item. Index out of bounds.",
+                                                            );
+                                                        }
                                                     };
-                                                },
+                                                }
                                                 Err(_) => {
                                                     _send_msg(&mut s, "Could not unlock history");
                                                 }
                                             }
-                                        },
+                                        }
                                         CmdIPC::Snapshot => {
                                             // Get mutex guard
                                             match history_for_thread.lock() {
@@ -411,34 +393,36 @@ impl Manager {
                                                     // Create snapshot, drop guard, send snapshot
                                                     let snapshot = unlocked_history.clone();
                                                     _send_snapshot(&mut s, snapshot);
-                                                },
+                                                }
                                                 Err(_) => {
                                                     // Send err if could not unlock
                                                     _send_msg(&mut s, "Could not unlock history");
                                                 }
                                             }
-                                        },
+                                        }
                                         CmdIPC::Stop => {
                                             stop_signal_writer.store(true, Ordering::SeqCst);
                                             _send_msg(&mut s, "Stop Signal recieved.");
                                         }
                                     }
-                                },
+                                }
                                 Payload::Response(_) => {
-                                    _send_msg(&mut s, "Wrong Payload type recieved. Expected CmdIpc but got IPCResponse.");
+                                    _send_msg(
+                                        &mut s,
+                                        "Wrong Payload type recieved. Expected CmdIpc but got IPCResponse.",
+                                    );
                                 }
                             }
                         });
-                    },
+                    }
                     Err(e) => {
                         eprintln!("Accept Error: {e}");
-                    },
+                    }
                 }
             }
-            
         }));
     }
-    
+
     /// Start all configured background services.
     ///
     /// **Behavior**:

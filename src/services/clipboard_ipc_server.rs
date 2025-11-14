@@ -1,36 +1,23 @@
 // System Crates
 use std::{
-    os::unix::net::{
-        UnixListener, 
-        UnixStream
-    },
-    io::{
-        Write,
-        Read
-    },
-    fs::remove_file
+    fs::remove_file,
+    io::{Read, Write},
+    os::unix::net::{UnixListener, UnixStream},
 };
 
 // External Crates
-use serde::{
-    Serialize, 
-    Deserialize
-};
 use rmp_serde::Serializer;
+use serde::{Deserialize, Serialize};
 
 // My Crates
 use crate::{
-    common::{
-        ClipboardItem, 
-        IPCServerError, 
-        SOCKET_PATH
-    }, 
-    history::ClipboardHistory
+    common::{ClipboardItem, IPCServerError, SOCKET_PATH},
+    history::ClipboardHistory,
 };
 
 // ------------------------- IPC Items -------------------------------
 /// Represents the commands that IPC Supports
-/// 
+///
 /// This enum allows for the following commands:
 /// * **Promote(usize)** - Command that promotes and item to top of history.
 /// * **Delete(usize)** - Command that deletes an item from history given its pos.
@@ -44,40 +31,40 @@ pub enum CmdIPC {
     DeleteThis(ClipboardItem),
     Snapshot,
     Clear,
-    Stop
+    Stop,
 }
 
 /// A data structure representing the Response of IPC.
-/// 
+///
 /// **Contains**:
 /// * **history_snapshot** - A snapshot of the current ClipboardHistory from the Clipboard Manager Daemon
 /// * **message** - Optional message if there are any errors.
 #[allow(unused)]
 #[derive(Debug, Serialize, Deserialize, Default)]
-pub struct IPCResponse { 
+pub struct IPCResponse {
     pub history_snapshot: Option<ClipboardHistory>,
-    pub message: Option<String>
+    pub message: Option<String>,
 }
 
 // In case another data or id is to be sent
 #[allow(unused)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IPCRequest {
-    pub cmd: CmdIPC
+    pub cmd: CmdIPC,
 }
 /// A data structure that contains data needed for a payload.
-/// 
+///
 /// **Contains**:
 /// * **buf** - A binary vector of transformed data
 /// * **len** - Length of the buf in u8 as bytes
 pub struct PayloadData {
     buf: Vec<u8>,
-    len: [u8; 4]
+    len: [u8; 4],
 }
 
 /// # Payload
 /// These are the available Payloads for the IPC Server.
-/// 
+///
 /// **Available**:
 /// * **Cmd(CmdIPC)** - CmdIPC for giving commands
 /// * **Resp(IPCResponse)** - IPCResponse that contains a snapshot and a message
@@ -90,14 +77,11 @@ pub enum Payload {
 impl Payload {
     /// Constructs PayloadData for a given Payload
     fn to_payload(&self) -> PayloadData {
-        let mut  buf: Vec<u8> = Vec::new();
+        let mut buf: Vec<u8> = Vec::new();
         let _ = self.serialize(&mut Serializer::new(&mut buf)).ok();
         let len: [u8; 4] = (buf.len() as u32).to_be_bytes();
-        
-        PayloadData { 
-            buf,
-            len
-        }
+
+        PayloadData { buf, len }
     }
 }
 // -------------------------------------------------------------------
@@ -124,7 +108,9 @@ pub fn create_bind() -> Result<UnixListener, IPCServerError> {
     let try_conn = create_default_stream();
 
     let Err(IPCServerError::FileNotFound | IPCServerError::ConnectionError(_)) = try_conn else {
-        return Err(IPCServerError::BindError("IPC Server appears to be already running".into()));
+        return Err(IPCServerError::BindError(
+            "IPC Server appears to be already running".into(),
+        ));
     };
 
     // Remove the old sock file
@@ -132,7 +118,7 @@ pub fn create_bind() -> Result<UnixListener, IPCServerError> {
 
     // Create a new listener
     let listener = match UnixListener::bind(SOCKET_PATH) {
-        Ok(listener) => {listener},
+        Ok(listener) => listener,
         Err(err) => {
             return Err(IPCServerError::BindError(format!("{:?}", err)));
         }
@@ -160,21 +146,15 @@ pub fn create_bind() -> Result<UnixListener, IPCServerError> {
 /// ```
 pub fn create_default_stream() -> Result<UnixStream, IPCServerError> {
     match UnixStream::connect(SOCKET_PATH) {
-        Ok(stream) => {
-            Ok(stream)
-        },
+        Ok(stream) => Ok(stream),
         Err(err) => {
             if let Some(err_code) = err.raw_os_error() {
                 match err_code {
-                    111 => {
-                        Err(IPCServerError::ConnectionError("Connection Refused by server.".into()))
-                    },
-                    2 => {
-                        Err(IPCServerError::FileNotFound)
-                    }
-                    _ => {
-                        Err(IPCServerError::ConnectionError(format!("{:?}", err)))
-                    }
+                    111 => Err(IPCServerError::ConnectionError(
+                        "Connection Refused by server.".into(),
+                    )),
+                    2 => Err(IPCServerError::FileNotFound),
+                    _ => Err(IPCServerError::ConnectionError(format!("{:?}", err))),
                 }
             } else {
                 Err(IPCServerError::ConnectionError(format!("{:?}", err)))
@@ -207,10 +187,10 @@ pub fn send_payload(stream: &mut UnixStream, item: Payload) {
     // Send len
     // We know the size of the length (4).
     // Using that, we can extract the length of actual message (x)
-    // and read for that len. 
+    // and read for that len.
     // This way sending message of changing length works.
     stream.write_all(&payload.len).unwrap();
-    
+
     // Send data
     stream.write_all(&payload.buf).unwrap();
 

@@ -1,28 +1,18 @@
 #[cfg(test)]
 mod clipboard_manager_test {
-    use arboard::{
-        Clipboard, 
-        ImageData
-    };
-    use serial_test::serial;
+    use arboard::{Clipboard, ImageData};
     use core::panic;
-    use std::{
-        thread,
-        borrow::Cow, 
-        sync::atomic::Ordering, 
-        time::Duration
-    };
+    use serial_test::serial;
+    use std::{borrow::Cow, sync::atomic::Ordering, thread, time::Duration};
     use super_v::{
-        common::{
-            ClipboardItem, 
-            DaemonError
-        }, 
+        common::{ClipboardItem, DaemonError},
         services::{
             clipboard_ipc_server::{
-                CmdIPC, IPCRequest, IPCResponse, Payload, create_default_stream, read_payload, send_payload
-            }, 
-            clipboard_manager::Manager
-        }
+                CmdIPC, IPCRequest, IPCResponse, Payload, create_default_stream, read_payload,
+                send_payload,
+            },
+            clipboard_manager::Manager,
+        },
     };
 
     // ------------------ Helper Functions ----------------------
@@ -50,13 +40,11 @@ mod clipboard_manager_test {
         thread::sleep(Duration::from_millis(250));
 
         // Update the clipboard history to have some things...
-        let _ = clipboard_service.set_image(
-            ImageData {
-                width: 1,
-                height: 1,
-                bytes: Cow::from([0u8; 4].as_ref()),
-            }
-        );
+        let _ = clipboard_service.set_image(ImageData {
+            width: 1,
+            height: 1,
+            bytes: Cow::from([0u8; 4].as_ref()),
+        });
         thread::sleep(Duration::from_millis(250));
 
         let _ = clipboard_service.set_text("item3");
@@ -72,19 +60,15 @@ mod clipboard_manager_test {
         let mut stream = create_default_stream().unwrap();
 
         // Sending the response as input should fail
-        send_payload(
-            &mut stream,
-            payload
-        );
+        send_payload(&mut stream, payload);
 
         let recieved_payload = read_payload(&mut stream);
-        
+
         // Cleanup
         manager.stop();
-        
+
         // Return the recieved payload
         recieved_payload
-
     }
 
     fn check_payload_message(payload: Payload, checker: &str) {
@@ -97,16 +81,14 @@ mod clipboard_manager_test {
 
     fn check_payload_history(payload: Payload, checker: Vec<ClipboardItem>) {
         if let Payload::Response(returned_response) = payload {
-
             match returned_response.history_snapshot {
                 Some(clipboard_history) => {
                     assert_eq!(clipboard_history.get_items(), &checker);
-                },
+                }
                 None => {
                     panic!("Clipboard History is None.");
-                },
+                }
             }
-
         } else {
             panic!("Returned payload type was not correct?");
         }
@@ -120,7 +102,7 @@ mod clipboard_manager_test {
         let mut manager = Manager::new().unwrap();
 
         // start polling
-        manager._polling_service(); 
+        manager._polling_service();
 
         // Give time
         thread::sleep(Duration::from_millis(50));
@@ -135,11 +117,14 @@ mod clipboard_manager_test {
         match manager._polling_handle.take() {
             Some(p_handle) => {
                 // Check if it's still running. It should not be.
-                assert!(p_handle.is_finished(), "Uh-oh! Poller still running after sending the Stop Signal");
+                assert!(
+                    p_handle.is_finished(),
+                    "Uh-oh! Poller still running after sending the Stop Signal"
+                );
 
                 // Join the thread.
                 let _ = p_handle.join();
-            },
+            }
             None => {
                 panic!("POLLING HANDLE EMPTY WHEN IT SHOULD NOT HAVE BEEN!");
             }
@@ -158,7 +143,7 @@ mod clipboard_manager_test {
         // Spawn another manager
         let err_manager = Manager::new();
 
-        // Check if 
+        // Check if
         match err_manager {
             Ok(_) => {
                 panic!("MANAGER SHOULD NOT HAVE BEEN STARTED. MULTIPLE MANAGERS SPAWNED!")
@@ -181,74 +166,68 @@ mod clipboard_manager_test {
         // close the manager
         manager.stop();
 
-        // Spawn a second manager 
+        // Spawn a second manager
         match Manager::new() {
-            Ok(_) => {/* Passed */},
-            Err(_) => {panic!("MANAGER DID NOT SPAWN! PREVIOUS MANAGER NOT CLEANED!")},
+            Ok(_) => { /* Passed */ }
+            Err(_) => {
+                panic!("MANAGER DID NOT SPAWN! PREVIOUS MANAGER NOT CLEANED!")
+            }
         };
-
     }
 
     #[test]
     #[serial]
     fn test_poller_clipboard_history_and_snapshot() {
-        let recieved_payload = beam_payload(
-            Payload::Request(
-                IPCRequest {
-                    cmd: CmdIPC::Snapshot
-                }
-            )
-        ); // <- Should return snapshot of the history
+        let recieved_payload = beam_payload(Payload::Request(IPCRequest {
+            cmd: CmdIPC::Snapshot,
+        })); // <- Should return snapshot of the history
         check_payload_history(recieved_payload, get_hopeful_history());
     }
 
     #[test]
     #[serial]
     fn test_invalid_ipc_command() {
-        let recieved_payload = beam_payload(Payload::Response(IPCResponse{
+        let recieved_payload = beam_payload(Payload::Response(IPCResponse {
             history_snapshot: None,
-            message: None
+            message: None,
         }));
 
-        check_payload_message(recieved_payload, "Wrong Payload type recieved. Expected CmdIpc but got IPCResponse.");
+        check_payload_message(
+            recieved_payload,
+            "Wrong Payload type recieved. Expected CmdIpc but got IPCResponse.",
+        );
     }
-    
+
     #[test]
     #[serial]
     fn test_promote_out_of_bound() {
-        let recieved_payload = beam_payload(
-            Payload::Request(
-                IPCRequest {
-                    cmd: CmdIPC::Promote(100) // <- 100 should exceed 0... cuz history empty...
-                }
-            )
+        let recieved_payload = beam_payload(Payload::Request(IPCRequest {
+            cmd: CmdIPC::Promote(100), // <- 100 should exceed 0... cuz history empty...
+        }));
+        check_payload_message(
+            recieved_payload,
+            "Could not promote item. Index out of bounds.",
         );
-        check_payload_message(recieved_payload, "Could not promote item. Index out of bounds.");
     }
 
     #[test]
     #[serial]
     fn test_delete_out_of_bound() {
-        let recieved_payload = beam_payload(
-            Payload::Request(
-                IPCRequest {
-                    cmd: CmdIPC::Delete(100) // <- 100 should exceed 0... cuz history empty...
-                }
-            )
+        let recieved_payload = beam_payload(Payload::Request(IPCRequest {
+            cmd: CmdIPC::Delete(100), // <- 100 should exceed 0... cuz history empty...
+        }));
+        check_payload_message(
+            recieved_payload,
+            "Could not delete item. Index out of bounds.",
         );
-        check_payload_message(recieved_payload, "Could not delete item. Index out of bounds.");
     }
 
     #[test]
     #[serial]
     fn test_promote_command() {
-        let recieved_payload = beam_payload(
-            Payload::Request(
-                IPCRequest {
-                    cmd: CmdIPC::Promote(1) // 1,2,3,i -> 2,1,3,i
-                }
-            )
-        );
+        let recieved_payload = beam_payload(Payload::Request(IPCRequest {
+            cmd: CmdIPC::Promote(1), // 1,2,3,i -> 2,1,3,i
+        }));
 
         let mut hopeful_history = get_hopeful_history();
         hopeful_history.swap(0, 1);
@@ -259,13 +238,9 @@ mod clipboard_manager_test {
     #[test]
     #[serial]
     fn test_delete_command() {
-        let recieved_payload = beam_payload(
-            Payload::Request(
-                IPCRequest {
-                    cmd: CmdIPC::Delete(0) // 1,2,3,i -> 2,3,i
-                }
-            )
-        );
+        let recieved_payload = beam_payload(Payload::Request(IPCRequest {
+            cmd: CmdIPC::Delete(0), // 1,2,3,i -> 2,3,i
+        }));
 
         let mut hopeful_history = get_hopeful_history();
         hopeful_history.remove(0);
@@ -276,13 +251,9 @@ mod clipboard_manager_test {
     #[test]
     #[serial]
     fn test_clear_command() {
-        let recieved_payload = beam_payload(
-            Payload::Request(
-                IPCRequest {
-                    cmd: CmdIPC::Clear // 1,2,3,i -> []
-                }
-            )
-        );
+        let recieved_payload = beam_payload(Payload::Request(IPCRequest {
+            cmd: CmdIPC::Clear, // 1,2,3,i -> []
+        }));
 
         check_payload_history(recieved_payload, vec![]);
     }

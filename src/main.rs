@@ -1,29 +1,16 @@
 // Standard Crates
-use std::{
-    fs,
-    thread,
-    process, 
-    time::Duration
-};
+use std::{fs, process, thread, time::Duration};
 
 // External Crates
-use clap::{
-    Parser,
-    Subcommand
-};
+use clap::{Parser, Subcommand};
 
 // My Crates
 use super_v::{
-    common::{
-        LOCK_PATH, 
-        SOCKET_PATH
-    }, 
+    common::{LOCK_PATH, SOCKET_PATH},
     gui::clipboard_gui::{MainThreadMsg, run_gui, send_command},
     services::{
-        clipboard_manager::Manager, 
-        ydotol::send_shift_insert,
-        clipboard_ipc_server::CmdIPC
-    }
+        clipboard_ipc_server::CmdIPC, clipboard_manager::Manager, ydotol::send_shift_insert,
+    },
 };
 
 /*
@@ -45,7 +32,7 @@ enum Command {
     OpenGui,
 
     /// Cleans any leftovers
-    Clean
+    Clean,
 }
 
 #[derive(Parser, Debug)]
@@ -65,11 +52,11 @@ fn start_manager_daemon() {
         Ok(manager) => {
             println!("Starting service...");
             manager
-        },
+        }
         Err(_) => {
             eprintln!("Another instance of Manager already running.");
             process::exit(0);
-        },
+        }
     };
 
     c_manager.start_daemon();
@@ -78,11 +65,11 @@ fn start_manager_daemon() {
 // ----------------------------- Main --------------------------------
 fn main() {
     // Daemon
-    let args= Args::parse();
+    let args = Args::parse();
     match args.command {
         Command::Start => {
             start_manager_daemon();
-        },
+        }
         Command::OpenGui => {
             use std::sync::mpsc::channel;
 
@@ -110,7 +97,7 @@ fn main() {
             // Should be in main thread
             run_gui(tx);
             let _ = ydotool_handle.join();
-        },
+        }
         Command::Clean => {
             let _ = fs::remove_file(SOCKET_PATH);
             let _ = fs::remove_file(LOCK_PATH);

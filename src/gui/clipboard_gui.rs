@@ -1,50 +1,31 @@
 use crate::{
-    common::ClipboardItem, 
-    history::ClipboardHistory, 
-    services::{
-        clipboard_ipc_server::{
-            CmdIPC,
-            IPCRequest,
-            Payload,
-            create_default_stream,
-            read_payload,
-            send_payload
-        }
-    }
-};
-use gdk_pixbuf::{InterpType, Pixbuf};
-use gtk4::{
-    self as gtk,
-    Application,
-    prelude::*,
-    gdk::Key
+    common::ClipboardItem,
+    history::ClipboardHistory,
+    services::clipboard_ipc_server::{
+        CmdIPC, IPCRequest, Payload, create_default_stream, read_payload, send_payload,
+    },
 };
 use arboard::{Clipboard, ImageData};
-use std::{
-    borrow::Cow,
-    collections::HashMap,
-    rc::Rc,
-    sync::mpsc::Sender,
-    thread,
-    time::Duration,
-};
+use gdk_pixbuf::{InterpType, Pixbuf};
 use gtk::gdk::Texture;
+use gtk4::{self as gtk, Application, gdk::Key, prelude::*};
+use std::{borrow::Cow, collections::HashMap, rc::Rc, sync::mpsc::Sender, thread, time::Duration};
 
 pub enum MainThreadMsg {
     AutoPaste,
     Close,
-    DeleteItem(ClipboardItem)
+    DeleteItem(ClipboardItem),
 }
 
 struct Gui {
-    window:           gtk::ApplicationWindow,
-    stack:            gtk::Stack,
-    clear_all_btn:    gtk::Button,
-    search_entry:     gtk::Entry,
-    items_box:        gtk::Box,
-    emoji_flow_box:   gtk::FlowBox,
+    window: gtk::ApplicationWindow,
+    stack: gtk::Stack,
+    clear_all_btn: gtk::Button,
+    search_entry: gtk::Entry,
+    items_box: gtk::Box,
+    emoji_flow_box: gtk::FlowBox,
     image_cache: Rc<std::cell::RefCell<HashMap<Vec<u8>, Texture>>>,
-    main_thread_tx:   Sender<MainThreadMsg>
+    main_thread_tx: Sender<MainThreadMsg>,
 }
 
 impl Gui {
@@ -57,10 +38,10 @@ impl Gui {
         // -----------------------------------------------------------
 
         // -------------------- Window Settings ----------------------
-        const WIDTH      : i32    = 360;
-        const HEIGHT     : i32    = 400;
-        const TOP_PANEL  : bool   = false;
-        const MODAL      : bool   = true;
+        const WIDTH: i32 = 360;
+        const HEIGHT: i32 = 400;
+        const TOP_PANEL: bool = false;
+        const MODAL: bool = true;
 
         window.set_default_size(WIDTH, HEIGHT);
         window.set_decorated(TOP_PANEL);
@@ -80,7 +61,7 @@ impl Gui {
         // --------------------- Main Layout --------------------------
         let main_box = gtk::Box::new(gtk::Orientation::Vertical, 0);
         main_box.add_css_class("main-box");
-        
+
         let header_box = gtk::Box::new(gtk::Orientation::Horizontal, 0);
         header_box.add_css_class("header-box");
 
@@ -150,7 +131,7 @@ impl Gui {
         window.set_child(Some(&main_box));
         stack_switcher.set_stack(Some(&stack));
         // ------------------------------------------------------------
-        
+
         // Create and return the Gui instance
         Rc::new(Self {
             window: window.clone(), // Clone for the struct
@@ -160,7 +141,7 @@ impl Gui {
             items_box: items_box.clone(), // Clone for the struct
             emoji_flow_box,
             image_cache: Rc::new(std::cell::RefCell::new(HashMap::new())),
-            main_thread_tx
+            main_thread_tx,
         })
     }
 
@@ -169,7 +150,7 @@ impl Gui {
             eprintln!("auto paste signal dropped: {err}");
         }
     }
-    
+
     fn get_clipboard() -> Result<Clipboard, arboard::Error> {
         Clipboard::new()
     }
@@ -192,19 +173,22 @@ impl Gui {
 
         match create_default_stream() {
             Ok(mut stream) => {
-                send_payload(&mut stream, Payload::Request(IPCRequest {
-                    cmd: CmdIPC::Snapshot
-                }));
-                
+                send_payload(
+                    &mut stream,
+                    Payload::Request(IPCRequest {
+                        cmd: CmdIPC::Snapshot,
+                    }),
+                );
+
                 let received_payload = read_payload(&mut stream);
                 match received_payload {
                     Payload::Response(ipc_resp) => {
                         ipc_resp.history_snapshot.unwrap_or(new_clipboard)
                     }
-                    _ => new_clipboard
+                    _ => new_clipboard,
                 }
             }
-            Err(_) => new_clipboard
+            Err(_) => new_clipboard,
         }
     }
 
@@ -225,7 +209,12 @@ impl Gui {
         items_box.append(&empty_box);
     }
 
-    fn construct_image(width: usize, height: usize, bytes: Vec<u8>, cache: &Rc<std::cell::RefCell<HashMap<Vec<u8>, Texture>>>) -> Option<gtk::Picture> {
+    fn construct_image(
+        width: usize,
+        height: usize,
+        bytes: Vec<u8>,
+        cache: &Rc<std::cell::RefCell<HashMap<Vec<u8>, Texture>>>,
+    ) -> Option<gtk::Picture> {
         const IMAGE_PREVIEW_TEXTURE_MAX_SIZE: usize = 200;
         const IMAGE_PREVIEW_DISPLAY_SIZE: i32 = 50;
 
@@ -239,7 +228,7 @@ impl Gui {
             picture.add_css_class("image-preview");
             return Some(picture);
         }
-        
+
         // 2. If not in cache, create it
         let stride = width.checked_mul(4)?;
         let expected_len = stride.checked_mul(height)?;
@@ -260,7 +249,8 @@ impl Gui {
             let scale = IMAGE_PREVIEW_TEXTURE_MAX_SIZE as f32 / max_dim;
             let target_width = (width as f32 * scale).round().max(1.0) as i32;
             let target_height = (height as f32 * scale).round().max(1.0) as i32;
-            if let Some(resized) = pixbuf.scale_simple(target_width, target_height, InterpType::Hyper)
+            if let Some(resized) =
+                pixbuf.scale_simple(target_width, target_height, InterpType::Hyper)
             {
                 pixbuf = resized;
             }
@@ -285,16 +275,21 @@ impl Gui {
         while let Some(child) = self.emoji_flow_box.first_child() {
             self.emoji_flow_box.remove(&child);
         }
-        
+
         let search_filter = self.search_entry.text().to_string();
 
         // 1. Get the full list of emoji strings (this is fast)
-        let emojis: Vec<String> = 
-            if !search_filter.trim().is_empty() {
-                emojis::iter().filter(|e| e.name().contains(&search_filter) && e.as_str() != "🧑‍🩰").map(|e| e.as_str().to_string()).collect()
-            } else {
-                emojis::iter().filter(|e| e.as_str() != "🧑‍🩰").map(|e| e.as_str().to_string()).collect()
-            };
+        let emojis: Vec<String> = if !search_filter.trim().is_empty() {
+            emojis::iter()
+                .filter(|e| e.name().contains(&search_filter) && e.as_str() != "🧑‍🩰")
+                .map(|e| e.as_str().to_string())
+                .collect()
+        } else {
+            emojis::iter()
+                .filter(|e| e.as_str() != "🧑‍🩰")
+                .map(|e| e.as_str().to_string())
+                .collect()
+        };
 
         // 2. Wrap the list in Rc for the async loader
         let emoji_list = Rc::new(emojis);
@@ -316,7 +311,7 @@ impl Gui {
                 for emoji in emojis_to_add {
                     let emoji_entry = gtk::Button::with_label(emoji);
                     emoji_entry.add_css_class("emoji-btn");
-                    
+
                     let window_clone = window.clone();
                     let tx_clone = tx.clone();
                     let emoji_str = emoji.clone(); // Clone for the closure
@@ -326,7 +321,9 @@ impl Gui {
                             let emoji_str = emoji_str.clone();
                             let _ = clipboard.set_text(&emoji_str);
 
-                            if let Err(err) = tx_clone.send(MainThreadMsg::DeleteItem(ClipboardItem::Text(emoji_str.clone()))) {
+                            if let Err(err) = tx_clone.send(MainThreadMsg::DeleteItem(
+                                ClipboardItem::Text(emoji_str.clone()),
+                            )) {
                                 eprintln!("delete signal dropped: {err}");
                             }
 
@@ -364,7 +361,7 @@ impl Gui {
             Self::clipboard_empty_state(&self.items_box);
             return;
         }
-        
+
         for item in items.iter() {
             let revealer = gtk::Revealer::new();
             revealer.set_transition_type(gtk::RevealerTransitionType::SlideUp);
@@ -394,9 +391,15 @@ impl Gui {
 
                     content_box.append(&content_label);
                 }
-                ClipboardItem::Image { width, height, bytes } => {
+                ClipboardItem::Image {
+                    width,
+                    height,
+                    bytes,
+                } => {
                     // Replace with image preview
-                    if let Some(picture) = Self::construct_image(*width, *height, bytes.clone(), &self.image_cache) {
+                    if let Some(picture) =
+                        Self::construct_image(*width, *height, bytes.clone(), &self.image_cache)
+                    {
                         content_box.append(&picture);
                     } else {
                         let preview = format!("Image: {width} x {height}");
@@ -416,12 +419,12 @@ impl Gui {
             let item_clone = item.clone();
             let window_clone = self.window.clone();
             let tx = self.main_thread_tx.clone();
-            
-            gesture.connect_released(move |_, _, _, _| {
 
-                if let ClipboardItem::Text(text) = &item_clone 
-                && let Ok(mut clipboard) = Self::get_clipboard()
-                && !text.trim().is_empty() {
+            gesture.connect_released(move |_, _, _, _| {
+                if let ClipboardItem::Text(text) = &item_clone
+                    && let Ok(mut clipboard) = Self::get_clipboard()
+                    && !text.trim().is_empty()
+                {
                     // Update system clipboard
                     // This says I'm dropping the clipboard too fast (5ms)
                     // eh... should be just fine.
@@ -433,17 +436,20 @@ impl Gui {
                     return;
                 }
 
-                if let ClipboardItem::Image {width, height, bytes} = &item_clone
-                && let Ok(mut clipboard) = Self::get_clipboard()
-                && !bytes.is_empty() { 
+                if let ClipboardItem::Image {
+                    width,
+                    height,
+                    bytes,
+                } = &item_clone
+                    && let Ok(mut clipboard) = Self::get_clipboard()
+                    && !bytes.is_empty()
+                {
                     // Same 5ms drop here...
-                    let _ = clipboard.set_image(
-                        ImageData {
-                            width: *width,
-                            height: *height,
-                            bytes: Cow::from(bytes)
-                        }
-                    );
+                    let _ = clipboard.set_image(ImageData {
+                        width: *width,
+                        height: *height,
+                        bytes: Cow::from(bytes),
+                    });
 
                     // Signal for auto paste and close the window
                     Self::signal_auto_paste(tx.clone());
@@ -454,7 +460,7 @@ impl Gui {
                 // Close the window
                 Self::close_window(window_clone.clone(), tx.clone());
             });
-            
+
             item_box.add_controller(gesture);
 
             // Delete button for each item
@@ -589,7 +595,7 @@ impl Gui {
 
         // Tab Switching
         // `self` is Rc<GUI>, so `self.clone()` clones the Rc
-        let gui_clone_stack = self.clone(); 
+        let gui_clone_stack = self.clone();
         self.stack.connect_visible_child_name_notify(move |stack| {
             // Call the instance method on the cloned Rc
             gui_clone_stack.handle_tab_switch(stack);
@@ -618,7 +624,7 @@ impl Gui {
                 Self::close_window(window_clone.clone(), tx.clone());
             }
         });
-        
+
         // Emoji Search
         // Clone the Rc for the search entry closure
         let gui_clone_search = self.clone();
@@ -657,9 +663,7 @@ fn build_ui(app: &Application, tx: Sender<MainThreadMsg>) {
 }
 
 pub fn run_gui(tx: Sender<MainThreadMsg>) {
-    let app = Application::builder()
-        .application_id(Gui::APP_ID)
-        .build();
+    let app = Application::builder().application_id(Gui::APP_ID).build();
 
     app.connect_activate(move |app| {
         build_ui(app, tx.clone());

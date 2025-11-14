@@ -4,10 +4,8 @@ mod ipc_tests {
 
     use serial_test::serial;
     use super_v::{
-        common::{IPCServerError, SOCKET_PATH}, services::clipboard_ipc_server::{
-            create_bind,
-            create_default_stream
-        }
+        common::{IPCServerError, SOCKET_PATH},
+        services::clipboard_ipc_server::{create_bind, create_default_stream},
     };
 
     #[test]
@@ -23,16 +21,19 @@ mod ipc_tests {
     fn test_create_bind_already_running() {
         // Create first listener
         let _listener1 = create_bind().unwrap();
-        
+
         // Try to create second listener - should fail
         let listener2 = create_bind();
         match listener2 {
             Ok(_) => {
                 panic!("Server should not be created. Two instances running!");
-            },
+            }
             Err(err) => {
-                assert_eq!(err, IPCServerError::BindError("IPC Server appears to be already running".into()));
-            },
+                assert_eq!(
+                    err,
+                    IPCServerError::BindError("IPC Server appears to be already running".into())
+                );
+            }
         }
     }
 
@@ -42,14 +43,18 @@ mod ipc_tests {
         let _ = remove_file(SOCKET_PATH);
 
         let stream = create_default_stream();
-        
+
         match stream {
-            Ok(_) => {panic!("ELEMENT OF SURPRISE! Stream connection was successful despite having no file.");},
+            Ok(_) => {
+                panic!(
+                    "ELEMENT OF SURPRISE! Stream connection was successful despite having no file."
+                );
+            }
             Err(err) => {
                 assert_eq!(err, IPCServerError::FileNotFound);
-            },
+            }
         }
-    }    
+    }
 
     #[test]
     #[serial]
@@ -63,10 +68,15 @@ mod ipc_tests {
         let stream = create_default_stream();
 
         match stream {
-            Ok(_) => {panic!("Stream connection was successful despite server not running.");},
+            Ok(_) => {
+                panic!("Stream connection was successful despite server not running.");
+            }
             Err(err) => {
-                assert_eq!(err, IPCServerError::ConnectionError("Connection Refused by server.".into()));
-            },
+                assert_eq!(
+                    err,
+                    IPCServerError::ConnectionError("Connection Refused by server.".into())
+                );
+            }
         }
     }
 
