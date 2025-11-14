@@ -77,7 +77,14 @@ After=systemd-udev-settle.service
 
 [Service]
 Type=simple
+# Load uinput module and set permissions *before* starting
+ExecStartPre=/sbin/modprobe uinput
+ExecStartPre=/bin/bash -c 'sudo chmod 0666 /dev/uinput'
+
+# Start the daemon (no sudo needed) and tell *it* to set the socket mode
 ExecStart=sudo ydotoold
+TimeoutStartSec=5
+ExecStartPost=/bin/bash -c 'sudo chmod 666 /tmp/.ydotool_socket'
 Restart=on-failure
 RestartSec=5
 
@@ -113,6 +120,9 @@ StandardError=append:/var/log/superv.log
 WantedBy=default.target
 EOF
 
+echo "[*] cleaning up build file..."
+cargo clean
+
 # Ensure the log file exists and is writable by the user (no sudo required)
 echo "[*] creating user-writable log at ${LOG_PATH}..."
 sudo touch "${LOG_PATH}"
@@ -127,7 +137,6 @@ sudo loginctl enable-linger "${USERNAME}"
 echo "[*] reloading system systemd and starting ydotoold service..."
 sudo systemctl daemon-reload
 sudo systemctl enable --now "${YDO_SERVICE_NAME}"
-sudo chmod 666 /tmp/.ydotool_socket 
 
 # Reload user daemon, enable and start the unit
 echo "[*] reloading user systemd and starting service..."
