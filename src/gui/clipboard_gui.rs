@@ -21,13 +21,13 @@ use gtk4::{
 };
 use arboard::{Clipboard, ImageData};
 use std::{
-    thread, 
+    borrow::Cow,
+    collections::HashMap,
+    rc::Rc,
     sync::mpsc::Sender,
-    borrow::Cow, 
-    rc::Rc
+    thread,
+    time::Duration,
 };
-
-use std::collections::HashMap;
 use gtk::gdk::Texture;
 
 pub enum MainThreadMsg {
@@ -178,10 +178,6 @@ impl GUI {
         while let Some(child) = items_box.first_child() {
             items_box.remove(&child);
         }
-    }
-
-    fn count_items(items_box: &gtk::Box) -> u32 {
-        items_box.observe_children().n_items()
     }
 
     fn close_window(window: gtk::ApplicationWindow, tx: Sender<MainThreadMsg>) {
@@ -370,6 +366,11 @@ impl GUI {
         }
         
         for item in items.iter() {
+            let revealer = gtk::Revealer::new();
+            revealer.set_transition_type(gtk::RevealerTransitionType::SlideUp);
+            revealer.set_transition_duration(220);
+            revealer.set_reveal_child(true);
+
             let item_box = gtk::Box::new(gtk::Orientation::Horizontal, 10);
             item_box.add_css_class("clipboard-item");
 
@@ -469,39 +470,43 @@ impl GUI {
 
             // Make the delete button functional
             let items_box = self.items_box.clone();
-            let item_box_clone = item_box.clone();
+            let item_revealer = revealer.clone();
 
             delete_btn.connect_clicked(move |_| {
-                // Get the index of the object
-                let current_index = (0..Self::count_items(&items_box))
+                let current_index = (0..items_box.observe_children().n_items())
                     .find(|&i| {
                         items_box
-                            .observe_children() // Get all children
-                            .item(i) // Position
-                            .and_then(|obj| obj.downcast::<gtk::Box>().ok()) // Convert object -> Box
-                            .as_ref() // Ref, no need to move
-                            == Some(&item_box_clone) // Matches the item we want to delete?
+                            .observe_children()
+                            .item(i)
+                            .and_then(|obj| obj.downcast::<gtk::Revealer>().ok())
+                            .as_ref()
+                            == Some(&item_revealer)
                     })
                     .unwrap_or(0) as usize;
 
-                // Remove that object from items box
-                items_box.remove(&item_box_clone);
-                
-                // If box is empty after deleting, add the "empty" message
-                if items_box.first_child().is_none() {
-                    Self::clipboard_empty_state(&items_box);   
-                }
+                item_revealer.set_reveal_child(false);
 
-                // Send command to update the server
-                thread::spawn(move || {
-                    send_command(CmdIPC::Delete(current_index));
+                let items_box_for_removal = items_box.clone();
+                let item_revealer_for_removal = item_revealer.clone();
+
+                gtk::glib::timeout_add_local_once(Duration::from_millis(220), move || {
+                    items_box_for_removal.remove(&item_revealer_for_removal);
+
+                    if items_box_for_removal.first_child().is_none() {
+                        Self::clipboard_empty_state(&items_box_for_removal);
+                    }
+
+                    thread::spawn(move || {
+                        send_command(CmdIPC::Delete(current_index));
+                    });
                 });
             });
 
             item_box.append(&content_box);
             item_box.append(&delete_btn);
 
-            self.items_box.append(&item_box);
+            revealer.set_child(Some(&item_box));
+            self.items_box.append(&revealer);
         }
     }
 
@@ -536,15 +541,54 @@ impl GUI {
 
         // Clear all btn connector
         self.clear_all_btn.connect_clicked(move |_| {
-            // Clear all items
-            Self::clear_items_box(&all_items);
+            let observer = all_items.observe_children();
+            let mut revealers: Vec<gtk::Revealer> = Vec::new();
 
-            // Show empty clipboard screen
-            Self::clipboard_empty_state(&all_items);
+            for idx in 0..observer.n_items() {
+                if let Some(obj) = observer
+                    .item(idx)
+                    .and_then(|o| o.downcast::<gtk::Revealer>().ok())
+                {
+                    revealers.push(obj);
+                }
+            }
 
-            // Send message to server to clear
-            thread::spawn(move || {
-                send_command(CmdIPC::Clear);
+            if revealers.is_empty() {
+                Self::clear_items_box(&all_items);
+                Self::clipboard_empty_state(&all_items);
+                thread::spawn(|| {
+                    send_command(CmdIPC::Clear);
+                });
+                return;
+            }
+
+            let original_spacing = all_items.spacing();
+            all_items.set_spacing(0);
+
+            for (idx, revealer) in revealers.iter().enumerate() {
+                let revealer_clone = revealer.clone();
+                let delay = (idx as u64) * 16;
+                gtk::glib::timeout_add_local_once(Duration::from_millis(delay), move || {
+                    revealer_clone.set_reveal_child(false);
+                });
+            }
+
+            let items_box_after = all_items.clone();
+            let spacing_restore = original_spacing;
+            let total_delay = 240 + (revealers.len() as u64 * 16);
+
+            gtk::glib::timeout_add_local_once(Duration::from_millis(total_delay), move || {
+                while let Some(child) = items_box_after.first_child() {
+                    items_box_after.remove(&child);
+                }
+
+                items_box_after.set_spacing(spacing_restore);
+
+                thread::spawn(|| {
+                    send_command(CmdIPC::Clear);
+                });
+
+                Self::clipboard_empty_state(&items_box_after);
             });
         });
 
