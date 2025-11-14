@@ -1,10 +1,14 @@
-# Super V
+![2](image/README/2.png)
+
+## A Linux Clipboard
 
 A modern Linux clipboard companion with a GTK4 popover UI, emoji picker, and instant auto-paste, built in Rust and inspired by Windows 11's clipboard panel.
 
 ## Overview
 
 Super V runs as a background daemon that watches your clipboard, keeps a searchable history of text and images, and exposes the data to a polished GUI. When you pick an entry (or an emoji), the app updates the system clipboard and simulates `Shift+Insert` through `ydotool` so the content lands right where you were typing.
+
+![](image/README/1.gif)
 
 ## Features
 

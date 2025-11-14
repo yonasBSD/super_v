@@ -121,7 +121,7 @@ WantedBy=default.target
 EOF
 
 echo "[*] cleaning up build file..."
-cargo clean
+# cargo clean
 
 # Ensure the log file exists and is writable by the user (no sudo required)
 echo "[*] creating user-writable log at ${LOG_PATH}..."

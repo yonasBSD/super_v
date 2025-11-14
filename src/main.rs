@@ -38,7 +38,7 @@ enum Command {
 #[derive(Parser, Debug)]
 #[command(
     name = "super_v",
-    version = "0.0.1",
+    version = "1.0.0",
     about = "Clipboard Service that looks like Win11",
     long_about = None
 )]
