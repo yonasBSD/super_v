@@ -98,7 +98,7 @@ impl Manager {
     /// - A fully constructed Manager with no active thread handles.
     pub fn new() -> Result<Self, DaemonError> {
         // New history
-        let history: Arc<Mutex<ClipboardHistory>> = Arc::new(
+        let _shared_history: Arc<Mutex<ClipboardHistory>> = Arc::new(
             Mutex::new(
                 ClipboardHistory::new(Self::CLIPBOARD_SIZE)
             )
@@ -129,12 +129,13 @@ impl Manager {
         // Try lock
         let lock_file = OpenOptions::new()
             .create(true)
+            .truncate(true)
             .write(true)
             .open(LOCK_PATH)
             .expect("Failed to open lock file");
 
         // Return error if lock fails
-        if let Err(_) = lock_file.try_lock_exclusive() {
+        if lock_file.try_lock_exclusive().is_err() {
             return Err(DaemonError::ManagerMultiSpawn);
         }
 
@@ -146,18 +147,13 @@ impl Manager {
         // Once file lock is gotten, create a new IPC Server
         // But first clear the previous sock file. Since we know we are the main owner of the manager.
         let _ = remove_file(SOCKET_PATH);
-        let server = match create_bind().map_err(|err| DaemonError::IPCErr(err)) {
-            Ok(server) => {server},
-            Err(err) => {
-                return Err(err);
-            }
-        };
+        let _server = create_bind().map_err(DaemonError::IPCErr)?;
 
         // Return the manager object
         Ok(Self {
-            _clipboard_service: _clipboard_service,
-            _shared_history: history,
-            _stop_signal: _stop_signal,
+            _clipboard_service,
+            _shared_history,
+            _stop_signal,
 
             // No handles yet.
             _polling_handle: None,
@@ -167,7 +163,7 @@ impl Manager {
             _lock_file: Some(lock_file),
 
             // Ipc Server
-            _server: server
+            _server
         })
     }
 

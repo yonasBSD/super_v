@@ -36,7 +36,7 @@ pub enum MainThreadMsg {
     DeleteItem(ClipboardItem)
 }
 
-struct GUI {
+struct Gui {
     window:           gtk::ApplicationWindow,
     stack:            gtk::Stack,
     clear_all_btn:    gtk::Button,
@@ -47,7 +47,7 @@ struct GUI {
     main_thread_tx:   Sender<MainThreadMsg>
 }
 
-impl GUI {
+impl Gui {
     const APP_ID: &str = "com.ecstra.super_v";
 
     fn new(app: &Application, main_thread_tx: Sender<MainThreadMsg>) -> Rc<Self> {
@@ -199,7 +199,7 @@ impl GUI {
                 let received_payload = read_payload(&mut stream);
                 match received_payload {
                     Payload::Response(ipc_resp) => {
-                        ipc_resp.history_snapshot.unwrap_or_else(|| new_clipboard)
+                        ipc_resp.history_snapshot.unwrap_or(new_clipboard)
                     }
                     _ => new_clipboard
                 }
@@ -419,41 +419,36 @@ impl GUI {
             
             gesture.connect_released(move |_, _, _, _| {
 
-                if let ClipboardItem::Text(text) = &item_clone {
-                    if let Ok(mut clipboard) = Self::get_clipboard() {
-                        if !text.trim().is_empty() {
-                            // Update system clipboard
-                            // This says I'm dropping the clipboard too fast (5ms)
-                            // eh... should be just fine.
-                            let _ = clipboard.set_text(text);
+                if let ClipboardItem::Text(text) = &item_clone 
+                && let Ok(mut clipboard) = Self::get_clipboard()
+                && !text.trim().is_empty() {
+                    // Update system clipboard
+                    // This says I'm dropping the clipboard too fast (5ms)
+                    // eh... should be just fine.
+                    let _ = clipboard.set_text(text);
 
-                            // Signal for auto paste and close the window
-                            Self::signal_auto_paste(tx.clone());
-                            Self::close_window(window_clone.clone(), tx.clone());
-                            return;
-                        }
-                    }
+                    // Signal for auto paste and close the window
+                    Self::signal_auto_paste(tx.clone());
+                    Self::close_window(window_clone.clone(), tx.clone());
+                    return;
                 }
 
-                if let ClipboardItem::Image {width, height, bytes} = &item_clone {
-
-                    if let Ok(mut clipboard) = Self::get_clipboard() {
-                        if !bytes.is_empty() {
-                            // Same 5ms drop here...
-                            let _ = clipboard.set_image(
-                                ImageData {
-                                    width: *width,
-                                    height: *height,
-                                    bytes: Cow::from(bytes)
-                                }
-                            );
-
-                            // Signal for auto paste and close the window
-                            Self::signal_auto_paste(tx.clone());
-                            Self::close_window(window_clone.clone(), tx.clone());
-                            return;
+                if let ClipboardItem::Image {width, height, bytes} = &item_clone
+                && let Ok(mut clipboard) = Self::get_clipboard()
+                && !bytes.is_empty() { 
+                    // Same 5ms drop here...
+                    let _ = clipboard.set_image(
+                        ImageData {
+                            width: *width,
+                            height: *height,
+                            bytes: Cow::from(bytes)
                         }
-                    }
+                    );
+
+                    // Signal for auto paste and close the window
+                    Self::signal_auto_paste(tx.clone());
+                    Self::close_window(window_clone.clone(), tx.clone());
+                    return;
                 }
 
                 // Close the window
@@ -657,13 +652,13 @@ fn build_ui(app: &Application, tx: Sender<MainThreadMsg>) {
     // Create the Gui. This struct now owns all the widgets.
     // The `Rc` will keep `gui` alive as long as the closures
     // (event handlers) are alive.
-    let gui = GUI::new(app, tx);
+    let gui = Gui::new(app, tx);
     gui.build();
 }
 
 pub fn run_gui(tx: Sender<MainThreadMsg>) {
     let app = Application::builder()
-        .application_id(GUI::APP_ID)
+        .application_id(Gui::APP_ID)
         .build();
 
     app.connect_activate(move |app| {

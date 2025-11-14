@@ -153,7 +153,7 @@ impl fmt::Display for ClipboardHistory {
                     printable += &format!("\r\n{}       | Image ({}, {})     ", pos, width, height);
                 },
                 ClipboardItem::Text(string) => {
-                    printable += &format!("\r\n{}       | {}     ", pos, string.to_string());
+                    printable += &format!("\r\n{}       | {}     ", pos, string);
                 }
             }
         }

@@ -53,7 +53,7 @@ pub enum CmdIPC {
 /// * **history_snapshot** - A snapshot of the current ClipboardHistory from the Clipboard Manager Daemon
 /// * **message** - Optional message if there are any errors.
 #[allow(unused)]
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct IPCResponse { 
     pub history_snapshot: Option<ClipboardHistory>,
     pub message: Option<String>
@@ -65,16 +65,6 @@ pub struct IPCResponse {
 pub struct IPCRequest {
     pub cmd: CmdIPC
 }
-
-impl Default for IPCResponse {
-    fn default() -> Self {
-        Self {
-            history_snapshot: None,
-            message: None
-        }
-    }
-}
-
 /// A data structure that contains data needed for a payload.
 /// 
 /// **Contains**:
@@ -102,11 +92,11 @@ impl Payload {
     fn to_payload(&self) -> PayloadData {
         let mut  buf: Vec<u8> = Vec::new();
         let _ = self.serialize(&mut Serializer::new(&mut buf)).ok();
-        let payload_len: [u8; 4] = (buf.len() as u32).to_be_bytes();
+        let len: [u8; 4] = (buf.len() as u32).to_be_bytes();
         
         PayloadData { 
-            buf: buf,
-            len: payload_len
+            buf,
+            len
         }
     }
 }
@@ -144,7 +134,7 @@ pub fn create_bind() -> Result<UnixListener, IPCServerError> {
     let listener = match UnixListener::bind(SOCKET_PATH) {
         Ok(listener) => {listener},
         Err(err) => {
-            return Err(IPCServerError::BindError(String::from(format!("{:?}", err))));
+            return Err(IPCServerError::BindError(format!("{:?}", err)));
         }
     };
 
@@ -183,11 +173,11 @@ pub fn create_default_stream() -> Result<UnixStream, IPCServerError> {
                         Err(IPCServerError::FileNotFound)
                     }
                     _ => {
-                        Err(IPCServerError::ConnectionError(String::from(format!("{:?}", err))))
+                        Err(IPCServerError::ConnectionError(format!("{:?}", err)))
                     }
                 }
             } else {
-                Err(IPCServerError::ConnectionError(String::from(format!("{:?}", err))))
+                Err(IPCServerError::ConnectionError(format!("{:?}", err)))
             }
         }
     }

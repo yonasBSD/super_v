@@ -150,6 +150,7 @@ Pull requests, bug reports, and feature ideas are welcome:
 Ideas that would help a ton:
 
 - Replace `unwrap()` hotspots with surfaced errors.
+- Enhanced tests + more coverage.
 - Persist history across restarts.
 - Extend format support (rich text, HTML fragments, etc.).
 - Extended Emojis (ASCII?)
