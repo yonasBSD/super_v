@@ -79,6 +79,15 @@ Bind a global shortcut in your desktop’s keyboard settings (or window manager 
 
 **Example (Ubuntu 24.04 / GNOME):** Settings → Keyboard → View and Customize Shortcuts → Custom Shortcuts → add a shortcut named “Super V” with command `super_v open-gui`, then press `Super+V` when prompted for the key combo.
 
+### GNOME blur (optional)
+
+To blur the Super V window under GNOME, configure the **Blur my Shell** extension:
+
+1. Install the Blur my Shell extension from GNOME Extensions if you do not already have it.
+2. Open the extension preferences and switch to the **Applications** tab.
+3. Click **Add window**, then press `Esc` to create a new blank “Window Name” entry.
+4. Expand the new entry and enter `com.ecstra.super_v` in the text box.
+
 ### Service management
 
 > **Note**: Auto handled by install.sh
