@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Super V
+Comment=Clipboard manager with emoji picker and auto paste
+Exec=super_v open-gui
+Icon=com.ecstra.super_v
+Terminal=false
+StartupWMClass=com.ecstra.super_v
+TryExec=/usr/local/bin/super_v
+Categories=Utility;GTK;
+Keywords=Clipboard;Emoji;History;
+StartupNotify=true

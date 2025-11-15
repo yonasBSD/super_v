@@ -66,6 +66,38 @@ echo "[*] Installing service..."
 sudo cp ./target/release/super_v /usr/local/bin/
 sudo chmod +x /usr/local/bin/super_v
 
+# Install application icons so the GTK window resolves the app ID.
+echo "[*] installing application icons..."
+ICON_NAME="com.ecstra.super_v"
+ICON_DIR="/usr/share/icons/hicolor"
+
+install_icon() {
+    local size="$1"
+    local src="assets/icons/${size}x${size}.png"
+    local dest="${ICON_DIR}/${size}x${size}/apps/${ICON_NAME}.png"
+
+    if [ -f "${src}" ]; then
+        sudo install -Dm644 "${src}" "${dest}"
+    else
+        echo "[!] missing ${src}, skipping ${size}x${size} icon"
+    fi
+}
+
+install_icon 32
+install_icon 192
+install_icon 512
+
+if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+    sudo gtk-update-icon-cache "${ICON_DIR}"
+fi
+
+echo "[*] installing desktop entry..."
+sudo install -Dm644 assets/super_v.desktop \
+    "/usr/share/applications/super_v.desktop"
+if command -v update-desktop-database >/dev/null 2>&1; then
+    sudo update-desktop-database /usr/share/applications
+fi
+
 # Write ydotoold system service
 echo "[*] writing ydotoold system service to ${YDO_SERVICE_PATH}..."
 # We use sudo bash -c to write to a root-owned file
@@ -121,7 +153,7 @@ WantedBy=default.target
 EOF
 
 echo "[*] cleaning up build file..."
-cargo clean
+# cargo clean
 
 # Ensure the log file exists and is writable by the user (no sudo required)
 echo "[*] creating user-writable log at ${LOG_PATH}..."
@@ -142,6 +174,7 @@ sudo systemctl enable --now "${YDO_SERVICE_NAME}"
 echo "[*] reloading user systemd and starting service..."
 systemctl --user daemon-reload
 systemctl --user enable --now "${SERVICE_NAME}"
+sudo update-desktop-database /usr/share/applications
 
 echo
 echo "[*] status (ydotoold system unit):"

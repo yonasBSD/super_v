@@ -165,7 +165,6 @@ impl Manager {
 
         // Start the polling in a thread and store the handle
         self._polling_handle = Some(thread::spawn(move || {
-
             let empty_item = ClipboardItem::Text("".to_string());
 
             // Get the current item in clipboard. This will be compared with and edited
@@ -271,7 +270,6 @@ impl Manager {
         // Parse the Cmd and apply operation on the clipboard history
         // Finally, send a snapshot of the history
         self._command_handle = Some(thread::spawn(move || {
-
             // Handle incoming messages
             for stream in ipc_server.incoming() {
                 // Break the loop if stop_signal is found

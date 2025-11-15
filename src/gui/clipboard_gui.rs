@@ -34,6 +34,7 @@ impl Gui {
         // -------------------- Window Creation ----------------------
         let window = gtk::ApplicationWindow::builder().build();
         window.set_application(Some(app));
+
         // -----------------------------------------------------------
 
         // -------------------- Window Settings ----------------------
@@ -689,6 +690,9 @@ fn build_ui(app: &Application, tx: Sender<MainThreadMsg>) {
 }
 
 pub fn run_gui(tx: Sender<MainThreadMsg>) {
+    gtk::glib::set_application_name("Super V");
+    gtk::glib::set_prgname(Some("super_v"));
+
     let app = Application::builder().application_id(Gui::APP_ID).build();
 
     app.connect_activate(move |app| {

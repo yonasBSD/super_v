@@ -56,6 +56,30 @@ sudo rm -f "${YDOOLD_BIN_PATH}"
 sudo rm -f "${YDO_MAN1_PATH}"
 sudo rm -f "${YDOOLD_MAN8_PATH}"
 
+echo "[*] 5b. Removing application icons..."
+ICON_NAME="com.ecstra.super_v"
+ICON_DIR="/usr/share/icons/hicolor"
+
+remove_icon() {
+    local size="$1"
+    local target="${ICON_DIR}/${size}x${size}/apps/${ICON_NAME}.png"
+    sudo rm -f "${target}"
+}
+
+remove_icon 32
+remove_icon 192
+remove_icon 512
+
+if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+    sudo gtk-update-icon-cache "${ICON_DIR}"
+fi
+
+echo "[*] 5c. Removing desktop entry..."
+sudo rm -f "/usr/share/applications/super_v.desktop"
+if command -v update-desktop-database >/dev/null 2>&1; then
+    sudo update-desktop-database /usr/share/applications
+fi
+
 echo "[*] 6. Removing log and socket files..."
 sudo rm -f "${LOG_PATH}"
 rm -f "${OLD_LOG_PATH}" 2>/dev/null || true
