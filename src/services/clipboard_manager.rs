@@ -154,7 +154,7 @@ impl Manager {
     pub fn _polling_service(&mut self) {
         // Check if polling thread is already started
         let None = self._polling_handle else {
-            println!("Polling service is already running");
+            eprintln!("Polling service is already running");
             return;
         };
 
@@ -162,11 +162,9 @@ impl Manager {
         let clipboard_service = self._clipboard_service.clone();
         let stop_signal = self._stop_signal.clone();
         let shared_history = self._shared_history.clone();
-        println!("Started Polling...");
 
         // Start the polling in a thread and store the handle
         self._polling_handle = Some(thread::spawn(move || {
-            println!("Started Polling in thread...");
 
             let empty_item = ClipboardItem::Text("".to_string());
 
@@ -207,7 +205,6 @@ impl Manager {
                             Ok(mut unlocked_history) => {
                                 // Add item to history
                                 unlocked_history.add(current_item.clone());
-                                println!("Curent History: \n{}\r\n", unlocked_history);
 
                                 // Update the last item within this
                                 last_item = current_item
@@ -274,7 +271,6 @@ impl Manager {
         // Parse the Cmd and apply operation on the clipboard history
         // Finally, send a snapshot of the history
         self._command_handle = Some(thread::spawn(move || {
-            println!("Listening for Commands");
 
             // Handle incoming messages
             for stream in ipc_server.incoming() {
