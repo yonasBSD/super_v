@@ -7,10 +7,8 @@ use clap::{Parser, Subcommand};
 // My Crates
 use super_v::{
     common::{LOCK_PATH, SOCKET_PATH},
-    gui::clipboard_gui::{MainThreadMsg, run_gui, send_command},
-    services::{
-        clipboard_ipc_server::CmdIPC, clipboard_manager::Manager, ydotol::send_shift_insert,
-    },
+    gui::clipboard_gui::{MainThreadMsg, run_gui},
+    services::{clipboard_manager::Manager, ydotool::send_shift_insert},
 };
 
 /*
@@ -79,10 +77,6 @@ fn main() {
             let ydotool_handle = std::thread::spawn(move || {
                 while let Ok(msg) = rx.recv() {
                     match msg {
-                        MainThreadMsg::DeleteItem(item) => {
-                            thread::sleep(Duration::from_millis(200));
-                            let _ = send_command(CmdIPC::DeleteThis(item));
-                        }
                         MainThreadMsg::AutoPaste => {
                             thread::sleep(Duration::from_millis(100));
                             send_shift_insert();

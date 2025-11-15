@@ -100,16 +100,16 @@ impl ClipboardHistory {
     ///
     /// * `item` - The item to delete
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics if the position is out of bounds
+    /// Returns `ClipboardError::IndexOutOfBound` if the item does not exist in the history.
     pub fn delete_this(&mut self, item_to_remove: ClipboardItem) -> Result<(), ClipboardError> {
-        let index_to_remove = self
-            .history
-            .iter()
-            .position(|x| *x == item_to_remove)
-            .unwrap();
-        self.delete(index_to_remove)
+        if let Some(index_to_remove) = self.history.iter().position(|item| *item == item_to_remove)
+        {
+            self.delete(index_to_remove)
+        } else {
+            Err(ClipboardError::IndexOutOfBound)
+        }
     }
 
     /// Returns a reference to all items in the clipboard history.

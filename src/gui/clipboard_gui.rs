@@ -14,7 +14,6 @@ use std::{borrow::Cow, collections::HashMap, rc::Rc, sync::mpsc::Sender, thread,
 pub enum MainThreadMsg {
     AutoPaste,
     Close,
-    DeleteItem(ClipboardItem),
 }
 
 struct Gui {
@@ -151,6 +150,30 @@ impl Gui {
         }
     }
 
+    fn schedule_emoji_cleanup(tx: Sender<MainThreadMsg>, emoji_text: String) {
+        thread::spawn(move || {
+            let target_item = ClipboardItem::Text(emoji_text);
+            for attempt in 0..5 {
+                thread::sleep(Duration::from_millis(120 * (attempt + 1) as u64));
+                if let Some(history) = Self::send_command(CmdIPC::Snapshot)
+                    && history.get_items().iter().any(|item| item == &target_item)
+                {
+                    // If emoji is found, delete that
+                    let _ = Self::send_command(CmdIPC::DeleteThis(target_item.clone()));
+
+                    // break out of the for loop
+                    break;
+                }
+            }
+
+            // close that gui process
+            // without this the process would be dangling...
+            if let Err(err) = tx.send(MainThreadMsg::Close) {
+                eprintln!("close signal dropped: {err}");
+            }
+        });
+    }
+
     fn get_clipboard() -> Result<Clipboard, arboard::Error> {
         Clipboard::new()
     }
@@ -189,6 +212,21 @@ impl Gui {
                 }
             }
             Err(_) => new_clipboard,
+        }
+    }
+
+    pub fn send_command(cmd: CmdIPC) -> Option<ClipboardHistory> {
+        match create_default_stream() {
+            Ok(mut stream) => {
+                send_payload(&mut stream, Payload::Request(IPCRequest { cmd }));
+
+                let received_payload = read_payload(&mut stream);
+                if let Payload::Response(ipc_resp) = received_payload {
+                    return ipc_resp.history_snapshot;
+                }
+                None
+            }
+            Err(_) => None,
         }
     }
 
@@ -321,14 +359,17 @@ impl Gui {
                             let emoji_str = emoji_str.clone();
                             let _ = clipboard.set_text(&emoji_str);
 
-                            if let Err(err) = tx_clone.send(MainThreadMsg::DeleteItem(
-                                ClipboardItem::Text(emoji_str.clone()),
-                            )) {
-                                eprintln!("delete signal dropped: {err}");
-                            }
-
+                            Self::schedule_emoji_cleanup(tx_clone.clone(), emoji_str.clone());
                             Self::signal_auto_paste(tx_clone.clone());
-                            Self::close_window(window_clone.clone(), tx_clone.clone());
+
+                            // manually close window, but don't quit program
+                            // This quits GUI but keeps main thread running
+                            // because of Ydotool thread
+                            // let that be handled by emoji cleanup thread
+                            window_clone.close();
+
+                            // This quits program
+                            // Self::close_window(window_clone.clone(), tx_clone.clone());
                         }
                     });
                     emoji_flow_box.insert(&emoji_entry, -1);
@@ -498,7 +539,7 @@ impl Gui {
                     }
 
                     thread::spawn(move || {
-                        send_command(CmdIPC::Delete(current_index));
+                        Self::send_command(CmdIPC::Delete(current_index));
                     });
                 });
             });
@@ -558,7 +599,7 @@ impl Gui {
                 Self::clear_items_box(&all_items);
                 Self::clipboard_empty_state(&all_items);
                 thread::spawn(|| {
-                    send_command(CmdIPC::Clear);
+                    Self::send_command(CmdIPC::Clear);
                 });
                 return;
             }
@@ -586,7 +627,7 @@ impl Gui {
                 items_box_after.set_spacing(spacing_restore);
 
                 thread::spawn(|| {
-                    send_command(CmdIPC::Clear);
+                    Self::send_command(CmdIPC::Clear);
                 });
 
                 Self::clipboard_empty_state(&items_box_after);
@@ -636,21 +677,6 @@ impl Gui {
 
         // Present the window
         self.window.present();
-    }
-}
-
-pub fn send_command(cmd: CmdIPC) -> Option<ClipboardHistory> {
-    match create_default_stream() {
-        Ok(mut stream) => {
-            send_payload(&mut stream, Payload::Request(IPCRequest { cmd }));
-
-            let received_payload = read_payload(&mut stream);
-            if let Payload::Response(ipc_resp) = received_payload {
-                return ipc_resp.history_snapshot;
-            }
-            None
-        }
-        Err(_) => None,
     }
 }
 

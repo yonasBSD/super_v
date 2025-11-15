@@ -91,6 +91,12 @@ sudo systemctl status ydotoold.service
 
 Logs live in `/var/log/superv.log`.
 
+## Known Issues
+
+- **Clipboard item layout**: Long text entries currently ignore the intended max width and can stretch rows taller than their neighbors.
+- **Emoji auto-paste reliability**: Occasionally an emoji does not paste on the first try and needs to be triggered again.
+- **Emoji cleanup timing**: The asynchronous clean-and-paste workflow for emojis is inconsistent. An emoji may linger in history for ~240 ms or fail to paste before the cleanup kicks in. A more reliable approach is planned.
+
 ## IPC API
 
 `SOCKET_PATH` is `/tmp/super_v.sock`. Clients talk MessagePack using the `Payload` enum.

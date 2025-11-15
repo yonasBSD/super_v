@@ -389,15 +389,12 @@ mod history_tests {
     }
 
     #[test]
-    #[should_panic]
-    fn test_delete_this_missing_item_panic() {
+    fn test_delete_this_missing_item_returns_err() {
         // Create history with a single entry and attempt to delete an unknown item
         let mut history = ClipboardHistory::new(2);
         history.add(ClipboardItem::Text("Known".to_string()));
 
-        // delete_this uses unwrap on the internal search, so a missing item should panic
-        history
-            .delete_this(ClipboardItem::Text("Missing".to_string()))
-            .unwrap();
+        let result = history.delete_this(ClipboardItem::Text("Missing".to_string()));
+        assert_eq!(result, Err(ClipboardError::IndexOutOfBound));
     }
 }

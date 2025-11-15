@@ -288,7 +288,6 @@ impl Manager {
                         thread::spawn(move || {
                             // Read the payload
                             let payload = read_payload(&mut s);
-                            println!("Recieved Payload: {:?}", payload);
 
                             // Match the payload and execute command
                             match payload {
@@ -439,8 +438,6 @@ impl Manager {
         while !daemon_stop_signal.load(Ordering::SeqCst) {
             thread::sleep(Duration::from_secs(1));
         }
-
-        println!("Stop signal recieved. Stopping!");
 
         // Shutdown when daemon stops
         self.stop();

@@ -1,4 +1,4 @@
 // Daemon Services
 pub mod clipboard_ipc_server;
 pub mod clipboard_manager;
-pub mod ydotol;
+pub mod ydotool;
